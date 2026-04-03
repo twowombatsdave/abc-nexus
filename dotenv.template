@@ -1,0 +1,10 @@
+# Copy this file to `.env` in the same folder, then replace the placeholders.
+# Command (PowerShell):  Copy-Item dotenv.template .env
+#
+# This file is safe to commit. Do not put real secrets in it.
+
+ASANA_ACCESS_TOKEN=PASTE_YOUR_PERSONAL_ACCESS_TOKEN_HERE
+ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
+
+# Optional — limit fetches to one project:
+# ASANA_PROJECT_GID=PASTE_PROJECT_GID_HERE

@@ -3,6 +3,7 @@
 # Run from repo root:  powershell -ExecutionPolicy Bypass -File scripts/init_local_env.ps1
 
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$template = Join-Path $root "dotenv.template"
 $example = Join-Path $root ".env.example"
 $target = Join-Path $root ".env"
 
@@ -10,10 +11,14 @@ if (Test-Path $target) {
     Write-Host ".env already exists — leaving it unchanged: $target"
     exit 0
 }
-if (-not (Test-Path $example)) {
-    Write-Host "Missing .env.example at: $example"
+$src = $template
+if (-not (Test-Path $src)) {
+    $src = $example
+}
+if (-not (Test-Path $src)) {
+    Write-Host "Missing dotenv.template or .env.example at repo root."
     exit 1
 }
-Copy-Item -Path $example -Destination $target
-Write-Host "Created $target — edit it and add ASANA_ACCESS_TOKEN and ASANA_WORKSPACE_GID."
+Copy-Item -Path $src -Destination $target
+Write-Host "Created $target — replace PASTE_… placeholders with your Asana PAT and workspace GID."
 exit 0
