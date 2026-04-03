@@ -1,0 +1,31 @@
+# Uses repository secrets ASANA_ACCESS_TOKEN and ASANA_WORKSPACE_GID.
+# Run manually: Actions → "Verify Asana connection" → Run workflow.
+# This does NOT deploy Streamlit; it only proves credentials work from CI.
+
+name: Verify Asana connection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      ASANA_ACCESS_TOKEN: ${{ secrets.ASANA_ACCESS_TOKEN }}
+      ASANA_WORKSPACE_GID: ${{ secrets.ASANA_WORKSPACE_GID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install requests python-dotenv
+
+      - name: Verify Asana API
+        run: python scripts/verify_asana_connection.py
