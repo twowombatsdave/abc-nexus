@@ -27,6 +27,10 @@ ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
 # ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY=8
 
 # --- Touchpoints — see docs/touchpoints.md and docs/touchpoints-credentials-todo.md ---
+# Domain-wide delegation (SA JSON): path to file OR full JSON in GOOGLE_SERVICE_ACCOUNT_JSON
+# GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\service-account.json
+# GOOGLE_SERVICE_ACCOUNT_JSON=
+# WORKSPACE_IMPERSONATE_USER=dave@twowombats.com
 # GOOGLE_OAUTH_CLIENT_ID=
 # GOOGLE_OAUTH_CLIENT_SECRET=
 # GMAIL_REFRESH_TOKEN_DAVE=

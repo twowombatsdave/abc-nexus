@@ -42,6 +42,8 @@ You **cannot** “flip one switch” that grants API access without a **service 
 
 **Trade-off**: powerful — the SA can act as users for those scopes; use **readonly** scopes until you need send, and restrict who can use the key.
 
+**Do you need the JSON locally?** Only if you run connectors or `scripts/verify_google_workspace_dwd.py` on your machine. GitHub Actions can use the same JSON from a **secret** without a local file. For local runs, save a copy outside git (or gitignored path) and set `GOOGLE_APPLICATION_CREDENTIALS`, **or** paste the JSON into `GOOGLE_SERVICE_ACCOUNT_JSON` in `.env` (never commit).
+
 ---
 
 ## BigQuery (you already use this)
