@@ -6,6 +6,8 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
   ASANA_PROJECT_GID — optional; defaults to project 1209401086303491
   ASANA_TASK_SCOPE — optional; set to `workspace` to ignore project and use workspace+assignee
+  ASANA_PROJECT_INCLUDE_UNASSIGNED — optional; default true: in project scope, include open tasks
+    with no assignee (many board tasks are unassigned in the API). Set false to require assignee match.
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -133,10 +135,9 @@ def render_brand_content(
         return
     if tasks_in_scope == 0:
         st.warning(
-            "No tasks in **current scope**: no open tasks in this project assigned to "
-            "your configured assignees — or they live outside this project. "
-            "Add **`ASANA_TASK_SCOPE=workspace`** to `.env` (then refresh) to pull tasks "
-            "from the whole workspace for those assignees."
+            "No **incomplete** tasks in **current scope**: try **`ASANA_TASK_SCOPE=workspace`** "
+            "in `.env` (then refresh) for assignee tasks across the workspace, or ensure "
+            "**`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`** (default) so unassigned project tasks count."
         )
         return
     st.info(
@@ -152,7 +153,7 @@ def main() -> None:
 
     with st.sidebar:
         st.title("ABC System")
-        st.caption("Outstanding Asana tasks by brand keyword.")
+        st.caption("Open (incomplete) Asana tasks by brand keyword — completed tasks are excluded.")
         st.caption(
             "Assignees: **"
             + "**, **".join(assignee_names_from_env())
@@ -166,7 +167,9 @@ def main() -> None:
         else:
             st.caption(
                 f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
-                f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`)."
+                f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`). "
+                "Unassigned open tasks in this project are included by default "
+                "(`ASANA_PROJECT_INCLUDE_UNASSIGNED=false` to require Alan/Cormac only)."
             )
         refresh = st.button("Refresh from Asana")
         if refresh:
@@ -208,6 +211,9 @@ def main() -> None:
                 st.session_state.asana_resolved_assignees = tuple(result.resolved_assignees)
                 st.session_state.asana_tasks_in_scope = result.tasks_in_scope
                 st.session_state.asana_sample_titles = tuple(result.sample_task_titles)
+                st.session_state.asana_scope_includes_unassigned = bool(
+                    result.scope_includes_unassigned_incomplete
+                )
                 st.session_state.asana_last_error = None
                 data_mode = "live"
                 total = sum(len(v) for v in brand_tasks.values())
@@ -227,6 +233,7 @@ def main() -> None:
                 st.session_state.asana_resolved_assignees = ()
                 st.session_state.asana_tasks_in_scope = None
                 st.session_state.asana_sample_titles = ()
+                st.session_state.asana_scope_includes_unassigned = False
                 brand_tasks = st.session_state.tasks_by_brand
                 data_mode = "error"
                 prefix = "Asana configuration" if isinstance(e, AsanaConfigError) else "Asana request"
@@ -246,10 +253,14 @@ def main() -> None:
     scope_for_ui = st.session_state.get("asana_tasks_in_scope")
     if scope_for_ui is None or data_mode == "demo":
         scope_for_ui = sum(len(v) for v in brand_tasks.values())
+    scope_note = ""
+    if data_mode == "live" and st.session_state.get("asana_scope_includes_unassigned"):
+        scope_note = " · Project scope includes **unassigned** open tasks (see sidebar)."
     st.caption(
-        f"Data: **{data_mode}** · **{scope_for_ui}** task(s) in scope before brand filter · "
+        f"Data: **{data_mode}** · **{scope_for_ui}** incomplete task(s) in scope before brand filter · "
         f"Keywords in `integrations/asana/brands.py`. "
         f"Events → `logs/ui_events.jsonl`."
+        f"{scope_note}"
     )
     if (
         data_mode == "live"

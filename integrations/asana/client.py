@@ -58,6 +58,7 @@ class DashboardFetchResult:
     missing_assignees: tuple[str, ...]
     tasks_in_scope: int  # open tasks for assignees after project/workspace scope, before brand filter
     sample_task_titles: tuple[str, ...]  # first few titles for troubleshooting
+    scope_includes_unassigned_incomplete: bool = False  # project mode: unassigned rows included
 
 
 def get_asana_token() -> str | None:
@@ -124,6 +125,43 @@ def _task_assignee_gid(task: dict[str, Any]) -> str | None:
     if isinstance(a, dict) and a.get("gid"):
         return str(a["gid"])
     return None
+
+
+def _is_task_incomplete(task: dict[str, Any]) -> bool:
+    """True when the task is not marked completed (open / incomplete only)."""
+    return task.get("completed") is not True
+
+
+def project_include_unassigned_from_env() -> bool:
+    """
+    When scoping by project, include incomplete tasks with no assignee.
+
+    Asana often returns ``assignee: null`` for tasks that only live in a board/project;
+    strict assignee-only filtering then yields zero rows. Default is to include those
+    tasks. Set ``ASANA_PROJECT_INCLUDE_UNASSIGNED=false`` to require an assignee match.
+    """
+    raw = os.environ.get("ASANA_PROJECT_INCLUDE_UNASSIGNED", "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def _filter_project_tasks_for_assignees(
+    raw: list[dict[str, Any]],
+    allowed: set[str],
+    *,
+    include_unassigned: bool,
+) -> list[dict[str, Any]]:
+    """Keep incomplete tasks assigned to ``allowed``, and optionally unassigned ones."""
+    out: list[dict[str, Any]] = []
+    for t in raw:
+        if not _is_task_incomplete(t):
+            continue
+        ag = _task_assignee_gid(t)
+        if ag:
+            if ag in allowed:
+                out.append(t)
+        elif include_unassigned:
+            out.append(t)
+    return out
 
 
 def _paginate_tasks_in_project(
@@ -235,12 +273,15 @@ def fetch_incomplete_tasks_for_assignees(
     assignee_gids: list[str],
     *,
     project_gid: str | None = None,
+    include_unassigned_in_project: bool | None = None,
 ) -> list[dict[str, Any]]:
     """
-    Incomplete tasks for any of the given assignee user gids.
+    Incomplete (open) tasks for any of the given assignee user gids.
 
     With ``project_gid``: paginate tasks **in that project** only, then keep tasks assigned
     to one of ``assignee_gids`` (Asana forbids ``assignee`` + ``project`` query params).
+    Unassigned tasks in the project are included when ``include_unassigned_in_project`` is
+    True (default from :func:`project_include_unassigned_from_env`).
 
     Without ``project_gid``: paginate per assignee with ``assignee`` + ``workspace``.
     """
@@ -251,20 +292,21 @@ def fetch_incomplete_tasks_for_assignees(
     allowed = set(assignee_gids)
 
     if project_gid and project_gid.strip():
+        if include_unassigned_in_project is None:
+            include_unassigned_in_project = project_include_unassigned_from_env()
         raw = _paginate_tasks_in_project(session, project_gid.strip())
-        out: list[dict[str, Any]] = []
-        for t in raw:
-            if t.get("completed") is True:
-                continue
-            ag = _task_assignee_gid(t)
-            if ag and ag in allowed:
-                out.append(t)
-        return out
+        return _filter_project_tasks_for_assignees(
+            raw,
+            allowed,
+            include_unassigned=include_unassigned_in_project,
+        )
 
     by_task_gid: dict[str, dict[str, Any]] = {}
     for agid in assignee_gids:
         batch = _paginate_tasks_for_assignee(session, agid, workspace_gid, None)
         for t in batch:
+            if not _is_task_incomplete(t):
+                continue
             gid = t.get("gid")
             if gid:
                 by_task_gid[str(gid)] = t
@@ -300,7 +342,14 @@ def fetch_active_tasks_for_dashboard(
     if missing:
         logger.warning("Assignee names not found in workspace (skipping): %s", missing)
 
-    raw = fetch_incomplete_tasks_for_assignees(token, ws, gids, project_gid=project_gid)
+    inc_unassigned = project_include_unassigned_from_env() if project_gid else False
+    raw = fetch_incomplete_tasks_for_assignees(
+        token,
+        ws,
+        gids,
+        project_gid=project_gid,
+        include_unassigned_in_project=inc_unassigned if project_gid else None,
+    )
 
     gid_to_name = {str(u["gid"]): (u.get("name") or "").strip() for u in users if u.get("gid")}
 
@@ -323,6 +372,7 @@ def fetch_active_tasks_for_dashboard(
         missing_assignees=tuple(missing),
         tasks_in_scope=len(raw),
         sample_task_titles=titles,
+        scope_includes_unassigned_incomplete=bool(project_gid and inc_unassigned),
     )
 
 

@@ -13,3 +13,6 @@ ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
 # ASANA_PROJECT_GID=1209401086303491
 
 # Optional — if project scope returns no rows: ASANA_TASK_SCOPE=workspace
+
+# Optional — project scope: include open tasks with no assignee (default true; set false for strict):
+# ASANA_PROJECT_INCLUDE_UNASSIGNED=true
