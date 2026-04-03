@@ -7,8 +7,9 @@ Brand keywords match task title, plain notes, HTML-stripped description, and cus
 Uses GET /workspaces/{gid}/users to resolve names.
 
 Tasks: Asana does **not** allow ``assignee`` + ``project`` on ``GET /tasks`` (400). With a
-``project_gid`` we paginate ``GET /tasks?project=...&completed_since=now`` and keep tasks
-whose assignee is one of the configured users. Without a project, we use
+``project_gid`` we paginate ``GET /tasks?project=...&completed_since=now`` (top-level tasks
+only), then optionally merge **subtasks** via ``GET /tasks/{parent_gid}/subtasks`` — the
+project list API does not return subtask rows. Without a project, we use
 ``assignee`` + ``workspace`` per user.
 """
 
@@ -41,6 +42,7 @@ TASK_OPT_FIELDS: tuple[str, ...] = (
     "html_notes",
     "completed",
     "due_on",
+    "num_subtasks",
     "permalink_url",
     "assignee",
     "assignee.gid",
@@ -176,6 +178,111 @@ def _filter_project_tasks_for_assignees(
     return out
 
 
+def project_include_subtasks_from_env() -> bool:
+    """
+    After listing top-level project tasks, also fetch each task's subtasks (recursive).
+
+    Default **true**. Set ``ASANA_PROJECT_INCLUDE_SUBTASKS=false`` to skip (faster, fewer API calls).
+    """
+    raw = os.environ.get("ASANA_PROJECT_INCLUDE_SUBTASKS", "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def project_subtask_max_depth_from_env() -> int:
+    """How many subtask levels to walk under each project task (default ``5``)."""
+    raw = os.environ.get("ASANA_PROJECT_SUBTASK_MAX_DEPTH", "").strip()
+    if not raw:
+        return 5
+    try:
+        n = int(raw)
+        return max(0, min(n, 20))
+    except ValueError:
+        return 5
+
+
+def _paginate_subtasks_for_task(
+    session: requests.Session,
+    parent_task_gid: str,
+) -> list[dict[str, Any]]:
+    """Paginate ``GET /tasks/{parent}/subtasks`` with the same fields as project tasks."""
+    collected: list[dict[str, Any]] = []
+    offset: str | None = None
+    opt = ",".join(TASK_OPT_FIELDS)
+
+    while True:
+        params: dict[str, Any] = {
+            "limit": 100,
+            "opt_fields": opt,
+        }
+        if offset:
+            params["offset"] = offset
+
+        payload = _request_json(session, f"/tasks/{parent_task_gid}/subtasks", params)
+        batch = payload.get("data") or []
+        for item in batch:
+            if isinstance(item, dict):
+                collected.append(item)
+
+        next_page = payload.get("next_page")
+        if isinstance(next_page, dict) and next_page.get("offset"):
+            offset = str(next_page["offset"])
+        else:
+            break
+
+    return collected
+
+
+def _expand_project_tasks_with_subtasks(
+    session: requests.Session,
+    tasks: list[dict[str, Any]],
+    *,
+    max_depth: int,
+) -> list[dict[str, Any]]:
+    """
+    Merge in subtasks for each task in ``tasks`` (breadth-first), deduping by task gid.
+
+    Asana's ``GET /tasks?project=...`` omits subtasks; they only appear under
+    ``GET /tasks/{parent}/subtasks``.
+    """
+    from collections import deque
+
+    by_gid: dict[str, dict[str, Any]] = {}
+    for t in tasks:
+        gid = t.get("gid")
+        if gid:
+            by_gid[str(gid)] = t
+
+    queue: deque[tuple[str, int]] = deque()
+    for t in tasks:
+        if t.get("gid"):
+            queue.append((str(t["gid"]), 0))
+
+    fetched_subtasks_for_parent: set[str] = set()
+
+    while queue:
+        parent_gid, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+        if parent_gid in fetched_subtasks_for_parent:
+            continue
+        parent_task = by_gid.get(parent_gid)
+        ns = parent_task.get("num_subtasks") if isinstance(parent_task, dict) else None
+        if ns == 0:
+            fetched_subtasks_for_parent.add(parent_gid)
+            continue
+        fetched_subtasks_for_parent.add(parent_gid)
+        for st in _paginate_subtasks_for_task(session, parent_gid):
+            sg = st.get("gid")
+            if not sg:
+                continue
+            sgid = str(sg)
+            if sgid not in by_gid:
+                by_gid[sgid] = st
+            queue.append((sgid, depth + 1))
+
+    return list(by_gid.values())
+
+
 def _paginate_tasks_in_project(
     session: requests.Session,
     project_gid: str,
@@ -307,6 +414,12 @@ def fetch_incomplete_tasks_for_assignees(
         if include_unassigned_in_project is None:
             include_unassigned_in_project = project_include_unassigned_from_env()
         raw = _paginate_tasks_in_project(session, project_gid.strip())
+        if project_include_subtasks_from_env():
+            raw = _expand_project_tasks_with_subtasks(
+                session,
+                raw,
+                max_depth=project_subtask_max_depth_from_env(),
+            )
         return _filter_project_tasks_for_assignees(
             raw,
             allowed,

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import requests
+
 from integrations.asana.client import (
+    _expand_project_tasks_with_subtasks,
     _filter_project_tasks_for_assignees,
     _is_task_incomplete,
     _task_assignee_gid,
+    project_include_subtasks_from_env,
     project_include_unassigned_from_env,
 )
 
@@ -20,6 +24,36 @@ def test_is_task_incomplete() -> None:
     assert _is_task_incomplete({"completed": False}) is True
     assert _is_task_incomplete({"completed": None}) is True
     assert _is_task_incomplete({"completed": True}) is False
+
+
+def test_project_include_subtasks_default_on(monkeypatch) -> None:
+    monkeypatch.delenv("ASANA_PROJECT_INCLUDE_SUBTASKS", raising=False)
+    assert project_include_subtasks_from_env() is True
+    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "false")
+    assert project_include_subtasks_from_env() is False
+
+
+def test_expand_project_tasks_with_subtasks(monkeypatch) -> None:
+    def fake_subtasks(
+        session: requests.Session,
+        parent_gid: str,
+    ) -> list[dict]:
+        if parent_gid == "p1":
+            return [{"gid": "c1", "completed": False, "assignee": None, "num_subtasks": 0}]
+        return []
+
+    monkeypatch.setattr(
+        "integrations.asana.client._paginate_subtasks_for_task",
+        fake_subtasks,
+    )
+    session = requests.Session()
+    out = _expand_project_tasks_with_subtasks(
+        session,
+        [{"gid": "p1", "name": "parent", "num_subtasks": 1}],
+        max_depth=3,
+    )
+    gids = {t["gid"] for t in out}
+    assert gids == {"p1", "c1"}
 
 
 def test_project_include_unassigned_default_off(monkeypatch) -> None:
