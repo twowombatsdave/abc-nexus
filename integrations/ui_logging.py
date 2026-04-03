@@ -1,7 +1,8 @@
 """
 Append-only JSONL log for Streamlit UI events (local analysis; not for production PII).
 
-Log file: logs/ui_events.jsonl (gitignored). Each line is one JSON object.
+Log file: ``logs/ui_events.txt`` (gitignored). Each line is one JSON object (JSON Lines format).
+Uses a ``.txt`` suffix so tooling that ignores ``*.jsonl`` (e.g. Cursor) can still read it for QA.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from typing import Any
 _logger = logging.getLogger(__name__)
 
 _LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
-_LOG_FILE = _LOG_DIR / "ui_events.jsonl"
+_LOG_FILE = _LOG_DIR / "ui_events.txt"
 
 
 def log_ui_event(session_id: str, event: str, **fields: Any) -> None:

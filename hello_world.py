@@ -19,7 +19,7 @@ Local dev: copy .env.example to .env in this folder (never commit .env),
 
 Run: python -m streamlit run hello_world.py
 
-UI events append to logs/ui_events.jsonl (see integrations/ui_logging.py).
+UI events append to logs/ui_events.txt (see integrations/ui_logging.py).
 """
 
 from __future__ import annotations
@@ -265,7 +265,7 @@ def main() -> None:
     st.caption(
         f"Data: **{data_mode}** · **{scope_for_ui}** incomplete task(s) in scope before brand filter · "
         f"Keywords in `integrations/asana/brands.py`. "
-        f"Events → `logs/ui_events.jsonl`."
+        f"Events → `logs/ui_events.txt`."
         f"{scope_note}"
     )
     if (
