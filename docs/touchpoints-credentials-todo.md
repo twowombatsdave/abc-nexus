@@ -19,11 +19,28 @@ Use this when wiring **Gmail**, **Calendar**, **Slack**, **Gemini** summaries, a
 - [ ] `GMAIL_REFRESH_TOKEN_CORMAC` — `cormac@twowombats.com`
 - [ ] `GMAIL_REFRESH_TOKEN_WHOLESALE` — `wholesale@twowombats.com`
 
-**Alternative: domain-wide delegation (optional)**
+### If you are the Workspace admin: domain-wide delegation (no per-user OAuth)
 
-- [ ] Service account + Admin Console DWD for Gmail/Calendar scopes.
-- [ ] `GOOGLE_SERVICE_ACCOUNT_JSON` (full JSON as a **single** secret, or file path in CI only).
-- [ ] Document impersonation subjects (same three emails) in runbook — not always separate secrets.
+You **cannot** “flip one switch” that grants API access without a **service account** in Google Cloud, but you *can* approve that service account for the **whole domain** from Admin console. Then your app uses **one** SA key and **impersonates** `dave@`, `cormac@`, `wholesale@` via the `subject=` parameter — no refresh tokens per mailbox.
+
+**Google Cloud**
+
+- [ ] Create a **service account**; enable **Domain-wide delegation** on it; copy its **numeric Client ID**.
+- [ ] Enable APIs: **Gmail API**, **Google Calendar API** on the same project.
+- [ ] Create a **JSON key** for that SA → store as `GOOGLE_SERVICE_ACCOUNT_JSON` (secret). **Never commit.**
+
+**Admin console** (as super admin)
+
+- [ ] **Security** → **Access and data control** → **API controls** → **Domain-wide delegation** → **Add new**.
+- [ ] Enter the service account **Client ID** and the **OAuth scopes** (comma-separated), e.g. readonly:  
+  `https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/calendar.readonly`
+
+**App / CI**
+
+- [ ] Code uses the SA JSON + **impersonation** of each user email when calling Gmail/Calendar (same pattern as many Workspace automation tools).
+- [ ] GitHub secret: `GOOGLE_SERVICE_ACCOUNT_JSON` (or reuse your existing SA secret if it’s the same account and already has DWD + these scopes).
+
+**Trade-off**: powerful — the SA can act as users for those scopes; use **readonly** scopes until you need send, and restrict who can use the key.
 
 ---
 
