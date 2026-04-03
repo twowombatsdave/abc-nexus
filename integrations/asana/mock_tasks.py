@@ -29,6 +29,26 @@ def mock_tasks_universe() -> list[dict]:
     """A small pool of tasks covering brands + one non-matching row."""
     return [
         build_mock_task(
+            "z1",
+            "ZYN — retailer deck",
+            notes="Confirm zyn listing.",
+        ),
+        build_mock_task(
+            "z2",
+            "Velo POS sync",
+            notes="velo materials.",
+        ),
+        build_mock_task(
+            "z3",
+            "Nordic Spirit campaign",
+            notes="nordic spirit copy review.",
+        ),
+        build_mock_task(
+            "z4",
+            "FUMi compliance",
+            notes="fumi labeling.",
+        ),
+        build_mock_task(
             "m1",
             "Killa — retailer follow-up",
             notes="Confirm listing for Killa variant.",
@@ -65,7 +85,7 @@ def mock_tasks_universe() -> list[dict]:
             notes="ubbs listing.",
         ),
         build_mock_task(
-            "m8",
+            "m9",
             "Unrelated task",
             notes="No brand keywords here.",
         ),

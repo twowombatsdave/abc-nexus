@@ -1,5 +1,5 @@
 """
-ABC dashboard — Asana outstanding tasks by brand (Killa, SYX, ELF, Clew, FEDRS, LUMi, Ubbs).
+ABC dashboard — Asana outstanding tasks by brand (ZYN, Velo, Nordic Spirit, FUMi, Killa, SYX, ELF, Clew, FEDRS, LUMi, Ubbs).
 
 Environment (or Streamlit Cloud secrets with the same names):
   ASANA_ACCESS_TOKEN or ASANA_PAT — Personal Access Token

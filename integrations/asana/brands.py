@@ -7,6 +7,14 @@ from typing import Iterable
 
 # Tab order in the Streamlit UI (keys must match).
 BRAND_KEYWORDS: dict[str, list[str]] = {
+    "ZYN": ["zyn"],
+    "Velo": ["velo"],
+    "Nordic Spirit": [
+        "nordic spirit",
+        "nordicspirit",
+        "nordic-spirit",
+    ],
+    "FUMi": ["fumi"],
     "Killa": ["killa"],
     "SYX": ["syx"],
     "ELF": ["elf"],  # matched with word boundaries (see brand_matches_task)

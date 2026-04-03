@@ -12,6 +12,13 @@ def test_brand_matches_case_insensitive() -> None:
     assert brand_matches_task("Ubbs", "Nothing here", None, None) is False
 
 
+def test_legacy_brands() -> None:
+    assert brand_matches_task("ZYN", "Review zyn SKU", None, None) is True
+    assert brand_matches_task("Velo", "VELO roadmap", None, None) is True
+    assert brand_matches_task("Nordic Spirit", "nordicspirit pack", None, None) is True
+    assert brand_matches_task("FUMi", "fumi labels", None, None) is True
+
+
 def test_elf_word_boundary() -> None:
     assert brand_matches_task("ELF", "ELF launch pack", None, None) is True
     assert brand_matches_task("ELF", "Bookshelf install", None, None) is False
@@ -42,6 +49,10 @@ def test_filter_excludes_completed() -> None:
 def test_mock_universe_splits_by_brand() -> None:
     by = mock_tasks_by_brand()
     assert set(by.keys()) == {
+        "ZYN",
+        "Velo",
+        "Nordic Spirit",
+        "FUMi",
         "Killa",
         "SYX",
         "ELF",
@@ -50,8 +61,8 @@ def test_mock_universe_splits_by_brand() -> None:
         "LUMi",
         "Ubbs",
     }
-    assert len(mock_tasks_universe()) == 8
-    assert sum(len(v) for v in by.values()) == 7  # one task has no brand keywords
+    assert len(mock_tasks_universe()) == 12
+    assert sum(len(v) for v in by.values()) == 11  # one task has no brand keywords
 
 
 def test_get_project_gid_default(monkeypatch) -> None:
