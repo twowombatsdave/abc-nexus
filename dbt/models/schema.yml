@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: stg_example
+    description: "Staged customer segment data from seed file"
+    columns:
+      - name: segment_id
+        description: "Unique segment identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      - name: segment_name
+        description: "Name of the customer segment"
+        tests:
+          - not_null
+      - name: description
+        description: "Description of the customer segment"
+      - name: priority
+        description: "Priority level of the segment (High, Medium, Low)"
+        tests:
+          - accepted_values:
+              values: ['High', 'Medium', 'Low']
+
+  - name: int_example
+    description: "Intermediate customer segment data with business logic applied"
+    columns:
+      - name: segment_id
+        description: "Unique segment identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      - name: segment_name
+        description: "Name of the customer segment"
+        tests:
+          - not_null
+      - name: description
+        description: "Description of the customer segment"
+      - name: priority
+        description: "Priority level of the segment (High, Medium, Low)"
+        tests:
+          - accepted_values:
+              values: ['High', 'Medium', 'Low']
+
+  - name: fct_example
+    description: "Final customer segment fact table ready for analytics"
+    columns:
+      - name: segment_id
+        description: "Unique segment identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      - name: segment_name
+        description: "Name of the customer segment"
+        tests:
+          - not_null
+      - name: description
+        description: "Description of the customer segment"
+      - name: priority
+        description: "Priority level of the segment (High, Medium, Low)"
+        tests:
+          - accepted_values:
+              values: ['High', 'Medium', 'Low']

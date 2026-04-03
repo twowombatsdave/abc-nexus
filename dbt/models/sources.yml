@@ -1,0 +1,49 @@
+version: 2
+
+# sources:
+#   # Example: Shopify data source
+#   - name: shopify
+#     enabled: false
+#     database: your_database
+#     schema: shopify
+#     description: "Shopify data ingested via Fivetran or other ETL tool"
+#     tables:
+#       - name: orders
+#         description: "Shopify orders with customer and order information"
+#         columns:
+#           - name: id
+#             description: "Unique order identifier"
+#           - name: customer_id
+#             description: "Customer identifier"
+#           - name: total_price
+#             description: "Total order value"
+#           - name: created_at
+#             description: "Order creation timestamp"
+#       - name: order_line_items
+#         description: "Shopify order line items with product and quantity data"
+#         columns:
+#           - name: id
+#             description: "Unique line item identifier"
+#           - name: order_id
+#             description: "Order identifier (foreign key)"
+#           - name: product_id
+#             description: "Product identifier"
+#           - name: quantity
+#             description: "Quantity ordered"
+
+#   # Example: Google Sheets data source
+#   - name: google_sheets
+#     enabled: false
+#     database: your_database
+#     schema: google_sheets
+#     description: "Google Sheets data ingested via Fivetran or custom sync"
+#     tables:
+#       - name: customer_segments
+#         description: "Customer segmentation data from Google Sheets"
+#         columns:
+#           - name: customer_id
+#             description: "Customer identifier"
+#           - name: segment
+#             description: "Customer segment name"
+#           - name: last_updated
+#             description: "Last update timestamp"

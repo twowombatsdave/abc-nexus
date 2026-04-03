@@ -1,0 +1,28 @@
+name: "example_dbt"
+version: "1.0.0"
+
+profile: "dbt-profile"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+models:
+  +materialized: view
+  example_dbt:
+    staging:
+      +materialized: incremental
+    intermediate:
+      +materialized: table
+    marts:
+      +materialized: table
+
+seeds:
+  example_dbt:

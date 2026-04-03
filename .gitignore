@@ -1,0 +1,11 @@
+venv/
+.aws-sam/
+*.pyc
+__pycache__/
+config/
+dbt/logs/
+dbt/target/
+dbt/dbt.log
+dbt/dbt_packages/
+dbt/logs/
+dbt/.config/

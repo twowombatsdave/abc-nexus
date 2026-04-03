@@ -1,0 +1,12 @@
+dbt-profile:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('DBT_PROJECT_ID', 'reporting-446813') }}"
+      dataset: "{{ env_var('DBT_DATASET', 'example_dbt') }}"
+      keyfile: "{{ env_var('DBT_SERVICE_ACCOUNT', '../config/dbt_service_account.json') }}"
+      threads: 4
+      timeout_seconds: 3600
+      location: "{{ env_var('DBT_LOCATION', 'europe-west2') }}"

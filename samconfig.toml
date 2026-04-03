@@ -1,0 +1,17 @@
+version = 0.1
+
+[dev.deploy.parameters]
+stack_name = "my-project-dev"
+region = "eu-west-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = 'ProjectName="my-project" StageName="dev" NotificationEmail="adam.oreilly@twowombats.com" SlackChannelId="C09LZH9L204" AsanaParentTaskGid="1211792392538389"'
+tags = 'Project="my-project" Stage="dev"'
+
+[prod.deploy.parameters]
+stack_name = "my-project-prod"
+region = "eu-west-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = 'ProjectName="my-project" StageName="prod" NotificationEmail="adam.oreilly@twowombats.com" SlackChannelId="C09LZH9L204" AsanaParentTaskGid="1211792392538389"'
+tags = 'Project="my-project" Stage="prod"'

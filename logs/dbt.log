@@ -1,0 +1,55 @@
+[0m18:26:02.662021 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c69cedb0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c68974a0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c8a25b80>]}
+
+
+============================== 18:26:02.664419 | a8741e08-5021-427e-b15e-16cdfd28337f ==============================
+[0m18:26:02.664419 [info ] [MainThread]: Running with dbt=1.10.13
+[0m18:26:02.664866 [debug] [MainThread]: running dbt with arguments {'debug': 'False', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'introspect': 'True', 'quiet': 'False', 'log_format': 'default', 'static_parser': 'True', 'empty': 'None', 'target_path': 'None', 'send_anonymous_usage_stats': 'True', 'cache_selected_only': 'False', 'version_check': 'True', 'log_cache_events': 'False', 'log_path': 'logs', 'write_json': 'True', 'use_colors': 'True', 'printer_width': '80', 'profiles_dir': 'profiles', 'warn_error': 'None', 'partial_parse': 'True', 'use_experimental_parser': 'False', 'indirect_selection': 'eager', 'invocation_command': 'dbt debug --profiles-dir profiles', 'no_print': 'None', 'fail_fast': 'False'}
+[0m18:26:02.671120 [info ] [MainThread]: dbt version: 1.10.13
+[0m18:26:02.671690 [info ] [MainThread]: python version: 3.12.3
+[0m18:26:02.671999 [info ] [MainThread]: python path: /home/adam/dev-projects/twinit-template/venv/bin/python3
+[0m18:26:02.672294 [info ] [MainThread]: os info: Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.39
+[0m18:26:02.672595 [info ] [MainThread]: Using profiles dir at profiles
+[0m18:26:02.672880 [info ] [MainThread]: Using profiles.yml file at profiles/profiles.yml
+[0m18:26:02.673183 [info ] [MainThread]: Using dbt_project.yml file at /home/adam/dev-projects/twinit-template/dbt_project.yml
+[0m18:26:02.673479 [info ] [MainThread]: Configuration:
+[0m18:26:02.673761 [info ] [MainThread]:   profiles.yml file [[31mERROR not found[0m]
+[0m18:26:02.674041 [info ] [MainThread]:   dbt_project.yml file [[31mERROR not found[0m]
+[0m18:26:02.674322 [info ] [MainThread]: Required dependencies:
+[0m18:26:02.674622 [debug] [MainThread]: Executing "git --help"
+[0m18:26:02.675960 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           [--config-env=<name>=<envvar>] <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone     Clone a repository into a new directory\n   init      Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add       Add file contents to the index\n   mv        Move or rename a file, a directory, or a symlink\n   restore   Restore working tree files\n   rm        Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect    Use binary search to find the commit that introduced a bug\n   diff      Show changes between commits, commit and working tree, etc\n   grep      Print lines matching a pattern\n   log       Show commit logs\n   show      Show various types of objects\n   status    Show the working tree status\n\ngrow, mark and tweak your common history\n   branch    List, create, or delete branches\n   commit    Record changes to the repository\n   merge     Join two or more development histories together\n   rebase    Reapply commits on top of another base tip\n   reset     Reset current HEAD to the specified state\n   switch    Switch branches\n   tag       Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch     Download objects and refs from another repository\n   pull      Fetch from and integrate with another repository or a local branch\n   push      Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m18:26:02.676267 [debug] [MainThread]: STDERR: "b''"
+[0m18:26:02.676535 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m18:26:02.676831 [info ] [MainThread]: Connection test skipped since no profile was found
+[0m18:26:02.677161 [info ] [MainThread]: [31m2 checks failed:[0m
+[0m18:26:02.677451 [info ] [MainThread]: dbt looked for a profiles.yml file in profiles/profiles.yml, but did
+not find one. For more information on configuring your profile, consult the
+documentation:
+
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m18:26:02.677741 [info ] [MainThread]: Project loading failed for the following reason:
+ project path </home/adam/dev-projects/twinit-template/dbt_project.yml> not found
+
+[0m18:26:02.678401 [debug] [MainThread]: Resource report: {"command_name": "debug", "command_success": false, "command_wall_clock_time": 0.06147239, "process_in_blocks": "24", "process_kernel_time": 0.048852, "process_mem_max_rss": "98964", "process_out_blocks": "16", "process_user_time": 1.055209}
+[0m18:26:02.678801 [debug] [MainThread]: Command `dbt debug` failed at 18:26:02.678717 after 0.06 seconds
+[0m18:26:02.679121 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c8a25b80>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c6562840>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f17c6562900>]}
+[0m18:26:02.679451 [debug] [MainThread]: Flushing usage events
+[0m18:26:03.114559 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m18:39:27.603323 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe5818e9bb0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe58133bef0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe581362b10>]}
+
+
+============================== 18:39:27.605835 | 5f631269-e7e0-41c7-a3b6-1e59b24f75aa ==============================
+[0m18:39:27.605835 [info ] [MainThread]: Running with dbt=1.10.13
+[0m18:39:27.606284 [debug] [MainThread]: running dbt with arguments {'fail_fast': 'False', 'log_format': 'default', 'empty': 'None', 'printer_width': '80', 'no_print': 'None', 'profiles_dir': '/home/adam/.dbt', 'introspect': 'True', 'invocation_command': 'dbt deps', 'use_experimental_parser': 'False', 'warn_error': 'None', 'send_anonymous_usage_stats': 'True', 'log_cache_events': 'False', 'target_path': 'None', 'partial_parse': 'True', 'use_colors': 'True', 'version_check': 'True', 'indirect_selection': 'eager', 'static_parser': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'debug': 'False', 'write_json': 'True', 'log_path': 'logs', 'quiet': 'False', 'cache_selected_only': 'False'}
+[0m18:39:27.606763 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path /home/adam/dev-projects/twinit-template/dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m18:39:27.607405 [debug] [MainThread]: Resource report: {"command_name": "deps", "command_success": false, "command_wall_clock_time": 0.04964439, "process_in_blocks": "8", "process_kernel_time": 0.077469, "process_mem_max_rss": "98696", "process_out_blocks": "8", "process_user_time": 1.016781}
+[0m18:39:27.607780 [debug] [MainThread]: Command `dbt deps` failed at 18:39:27.607696 after 0.05 seconds
+[0m18:39:27.608070 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe584f63410>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe5810bd3a0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7fe580bef4a0>]}
+[0m18:39:27.608378 [debug] [MainThread]: Flushing usage events
+[0m18:39:28.030797 [debug] [MainThread]: An error was encountered while trying to flush usage events

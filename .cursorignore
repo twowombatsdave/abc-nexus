@@ -1,0 +1,53 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# Python/build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+.dist/
+build/
+dist/
+
+# Virtualenvs
+venv/
+.env/
+.venv/
+
+# SAM/Cloud build artifacts
+.aws-sam/
+
+# DBT local artifacts
+dbt/target/
+dbt/logs/
+
+# Coverage/reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Editor/OS junk
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# GitHub local metadata
+.git/
+.git-*/
+
+# Credentials and secrets (keep these out of AI context)
+config/*.json
+secrets*.json
+*.pem
+*.key
+*.p12
+
+# Large data dumps
+*.parquet
+*.feather
+*.csv
+*.ndjson
+*.jsonl
+*.log

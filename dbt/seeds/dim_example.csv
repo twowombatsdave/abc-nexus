@@ -1,0 +1,5 @@
+segment_id,segment_name,description,priority
+1,New Customer,First-time customers,High
+2,Regular Customer,Repeat customers who purchase monthly,Medium
+3,High Value,Customers with high lifetime value,High
+4,At Risk,Customers who haven't purchased recently,Low

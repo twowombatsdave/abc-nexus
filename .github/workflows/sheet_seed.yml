@@ -1,0 +1,84 @@
+name: Seed BigQuery from Google Sheet
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Ensure required libs are present
+          pip install google-cloud-bigquery gspread google-auth google-auth-oauthlib pandas
+
+      - name: Write Google credentials to file
+        run: |
+          echo "$GOOGLE_SERVICE_ACCOUNT" > $GITHUB_WORKSPACE/google_sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GITHUB_WORKSPACE/google_sa.json" >> $GITHUB_ENV
+        env:
+          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
+      - name: Run seeding script
+        run: |
+          python dbt/sheet_to_bigquery.py \
+            --sheet-id "1gWL7hi6ZdGrbYRQhVlxhKgmNJPQG45O5HOHuiJa7MiQ" \
+            --worksheet "Sheet1" \
+            --table-id "reporting-446813.dbt_example.dim_google_sheet_sync" \
+            --write-disposition "truncate"
+
+      - name: Notify Slack - Success
+        if: success()
+        run: |
+          if [ -n "${{ secrets.SLACK_BOT_TOKEN }}" ] && [ -n "${{ secrets.SLACK_CHANNEL_ID }}" ]; then
+            jq -n \
+              --arg channel "${{ secrets.SLACK_CHANNEL_ID }}" \
+              --arg text "✅ Sheet seed succeeded." \
+              '{channel:$channel, text:$text}' \
+            | curl -sS -X POST \
+                -H 'Content-Type: application/json; charset=utf-8' \
+                -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+                --data-binary @- \
+                https://slack.com/api/chat.postMessage; \
+          fi
+
+      - name: Notify Slack - Failure
+        if: failure()
+        run: |
+          if [ -n "${{ secrets.SLACK_BOT_TOKEN }}" ] && [ -n "${{ secrets.SLACK_CHANNEL_ID }}" ]; then
+            jq -n \
+              --arg channel "${{ secrets.SLACK_CHANNEL_ID }}" \
+              --arg text "❌ Sheet seed failed." \
+              '{channel:$channel, text:$text}' \
+            | curl -sS -X POST \
+                -H 'Content-Type: application/json; charset=utf-8' \
+                -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+                --data-binary @- \
+                https://slack.com/api/chat.postMessage; \
+          fi
+
+      - name: Create Asana Subtask on Failure
+        if: failure()
+        run: |
+          if [ -n "${{ secrets.ASANA_PAT }}" ] && [ -n "${{ secrets.ASANA_PARENT_TASK_GID }}" ]; then
+            jq -n \
+              --arg name "🚨 Sheet seed failed - ${{ github.workflow }}" \
+              --arg notes "Workflow: ${{ github.workflow }}\nRepository: ${{ github.repository }}\nRun ID: ${{ github.run_id }}\nCommit: ${{ github.sha }}\nActor: ${{ github.actor }}\nURL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nPlease investigate the failure." \
+              '{data:{name:$name, notes:$notes, assignee:"me"}}' \
+            | curl -sS -X POST https://app.asana.com/api/1.0/tasks/${{ secrets.ASANA_PARENT_TASK_GID }}/subtasks \
+                -H 'Content-Type: application/json; charset=utf-8' \
+                -H "Authorization: Bearer ${{ secrets.ASANA_PAT }}" \
+                --data-binary @- ; \
+          fi
+

@@ -1,0 +1,244 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Generic AWS SAM Template - Starting point for serverless applications
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: my-project
+    Description: Logical name prefix for all resources
+
+  StageName:
+    Type: String
+    Default: dev
+    Description: Deployment stage
+    AllowedValues:
+      - dev
+      - prod
+
+  NotificationEmail:
+    Type: String
+    Default: adam.oreilly@twowombats.com
+    Description: Email address for error notifications
+
+  GoogleServiceAccountSecretName:
+    Type: String
+    Default: google-service-account
+    Description: Name of the secret in AWS Secrets Manager containing Google Service Account credentials
+
+  DatabaseCredentialsSecretName:
+    Type: String
+    Default: database-credentials
+    Description: Name of the secret in AWS Secrets Manager containing database credentials
+
+  # Slack/Asana integration parameters
+  SlackChannelId:
+    Type: String
+    Default: C09LZH9L204
+    Description: Slack channel ID to post error notifications to
+
+  AsanaParentTaskGid:
+    Type: String
+    Default: 1211792392538389
+    Description: Asana parent task GID under which error subtasks will be created
+
+  SlackBotTokenSecretName:
+    Type: String
+    Default: slack-bot-token
+    Description: Secrets Manager secret name that stores the Slack bot token (raw string)
+
+  AsanaPatSecretName:
+    Type: String
+    Default: asana-pat
+    Description: Secrets Manager secret name that stores the Asana Personal Access Token (raw string)
+
+
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 300
+    MemorySize: 512
+
+Resources:
+  ###
+  # S3 Bucket for data storage
+  ###
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${StageName}-data-bucket"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+
+  ###
+  # SQS Queue for processing
+  ###
+  ProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-${StageName}-processing-queue"
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  ###
+  # SNS Topic for notifications
+  ###
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${StageName}-notifications"
+      DisplayName: "Project Notifications"
+
+  # SNS Subscription for error notifications
+  ErrorNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref NotificationTopic
+      Endpoint: !Ref NotificationEmail
+
+  ###
+  # API Gateway
+  ###
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${ProjectName}-${StageName}-api"
+      StageName: !Ref StageName
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  ###
+  # Lambda Functions
+  ###
+
+  # Main processing function
+  ProcessFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${StageName}-process"
+      Handler: handler.lambda_handler
+      CodeUri: src/
+      Environment:
+        Variables:
+          STAGE_NAME: !Ref StageName
+          PROJECT_NAME: !Ref ProjectName
+          BUCKET_NAME: !Ref DataBucket
+          QUEUE_URL: !Ref ProcessingQueue
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+          GOOGLE_SERVICE_ACCOUNT_SECRET: !Ref GoogleServiceAccountSecretName
+          DATABASE_CREDENTIALS_SECRET: !Ref DatabaseCredentialsSecretName
+          # Forward sync errors to the same error SQS consumed by ErrorHandlerFunction
+          ERROR_QUEUE_URL: !Ref ErrorQueue
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DataBucket
+        - S3WritePolicy:
+            BucketName: !Ref DataBucket
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ProcessingQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ErrorQueue.QueueName
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - Statement:
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GoogleServiceAccountSecretName}*"
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${DatabaseCredentialsSecretName}*"
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /process
+            Method: post
+        QueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ProcessingQueue.Arn
+            BatchSize: 10
+      # Lambda Destinations for error handling
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+        DestinationConfig:
+          OnFailure:
+            Type: SQS
+            Destination: !GetAtt ErrorQueue.Arn
+
+  # Error handling function
+  ErrorHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${StageName}-error-handler"
+      Handler: error_handler.handler
+      CodeUri: error_handler/
+      Environment:
+        Variables:
+          STAGE_NAME: !Ref StageName
+          PROJECT_NAME: !Ref ProjectName
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+          # Slack/Asana integration env vars
+          SLACK_CHANNEL_ID: !Ref SlackChannelId
+          ASANA_PARENT_TASK_GID: !Ref AsanaParentTaskGid
+          # Dynamic references to Secrets Manager. If your secrets are JSON, append :SecretString:key
+          SLACK_BOT_TOKEN: !Sub "{{resolve:secretsmanager:${SlackBotTokenSecretName}}}"
+          ASANA_PAT: !Sub "{{resolve:secretsmanager:${AsanaPatSecretName}}}"
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+      Events:
+        ErrorQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ErrorQueue.Arn
+            BatchSize: 10
+
+  # Error queue for Lambda Destinations
+  ErrorQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-${StageName}-lambda-errors"
+      MessageRetentionPeriod: 1209600  # 14 days
+      VisibilityTimeout: 360  # Must be >= Lambda timeout + buffer
+
+Outputs:
+  ApiGatewayUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+    Export:
+      Name: !Sub "${ProjectName}-${StageName}-api-url"
+
+  DataBucketName:
+    Description: Name of the S3 bucket for data storage
+    Value: !Ref DataBucket
+    Export:
+      Name: !Sub "${ProjectName}-${StageName}-bucket-name"
+
+  ProcessingQueueUrl:
+    Description: URL of the processing queue
+    Value: !Ref ProcessingQueue
+    Export:
+      Name: !Sub "${ProjectName}-${StageName}-queue-url"
+
+  NotificationTopicArn:
+    Description: ARN of the notification topic
+    Value: !Ref NotificationTopic
+    Export:
+      Name: !Sub "${ProjectName}-${StageName}-topic-arn"

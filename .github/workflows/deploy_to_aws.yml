@@ -1,0 +1,89 @@
+name: Deploy to AWS
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  STACK_NAME: my-project-prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::116981777811:role/GitHubActionsDeploymentRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Build and Deploy
+        run: |
+          sam build --use-container
+          sam deploy --config-env prod --resolve-s3 --no-confirm-changeset --no-fail-on-empty-changeset
+
+      - name: Fetch CloudFormation Outputs
+        id: cfn
+        run: |
+          outputs=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "Stacks[0].Outputs[].{Key:OutputKey,Value:OutputValue}" \
+            --output table)
+          echo "outputs<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$outputs" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Display deployment info
+        run: |
+          echo "🚀 Deployment completed successfully!"
+          echo "Check CloudFormation console for stack outputs."
+
+      - name: Notify Slack - Success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"channel\": \"${{ secrets.SLACK_CHANNEL_ID }}\",
+              \"text\": \"✅ AWS Deployment Completed Successfully!\\n\\n${{ steps.cfn.outputs.outputs }}\"
+            }" \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            https://slack.com/api/chat.postMessage
+
+      - name: Notify Slack - Failure
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"channel\": \"${{ secrets.SLACK_CHANNEL_ID }}\",
+              \"text\": \"❌ AWS Deployment Failed!\"
+            }" \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            https://slack.com/api/chat.postMessage
+
+      - name: Create Asana Subtask on Failure
+        if: failure()
+        run: |
+          curl -X POST https://app.asana.com/api/1.0/tasks/${{ secrets.ASANA_PARENT_TASK_GID }}/subtasks \
+            -H "Authorization: Bearer ${{ secrets.ASANA_PAT }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"data\": {
+                \"name\": \"🚨 AWS Deployment Failed - ${{ github.workflow }}\",
+                \"notes\": \"**Workflow:** ${{ github.workflow }}\n**Repository:** ${{ github.repository }}\n**Run ID:** ${{ github.run_id }}\n**Commit:** ${{ github.sha }}\n**Actor:** ${{ github.actor }}\n**URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\nPlease investigate the deployment failure.\",
+                \"assignee\": \"me\"
+              }
+            }"

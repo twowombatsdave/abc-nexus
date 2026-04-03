@@ -1,0 +1,64 @@
+name: Zap -> Issue -> Run
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  awards-update:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'Test Trigger'))
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Close issue on success
+      if: github.event_name == 'issues' && success()
+      run: |
+        curl -X PATCH \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }} \
+          -d '{"state": "closed"}'
+
+    - name: Notify Slack - Success
+      if: success()
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"channel\": \"${{ secrets.SLACK_CHANNEL_ID }}\",
+            \"text\": \"✅ Zap -> Issue -> Run Completed Successfully!\"
+          }" \
+          -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+          https://slack.com/api/chat.postMessage
+
+    - name: Notify Slack - Failure
+      if: failure()
+      run: |
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"channel\": \"${{ secrets.SLACK_CHANNEL_ID }}\",
+            \"text\": \"❌ Zap -> Issue -> Run Failed!\"
+          }" \
+          -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+          https://slack.com/api/chat.postMessage
+
+    - name: Create Asana Subtask on Success
+      if: failure()
+      run: |
+        curl -X POST https://app.asana.com/api/1.0/tasks/${{ secrets.ASANA_PARENT_TASK_GID }}/subtasks \
+          -H "Authorization: Bearer ${{ secrets.ASANA_PAT }}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"data\": {
+              \"name\": \"🚨 Issue Workflow Failed - ${{ github.workflow }}\",
+              \"notes\": \"**Workflow:** ${{ github.workflow }}\n**Repository:** ${{ github.repository }}\n**Run ID:** ${{ github.run_id }}\n**Commit:** ${{ github.sha }}\n**Actor:** ${{ github.actor }}\n**URL:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n**Issue:** ${{ github.event.issue.html_url }}\n\nPlease investigate the workflow failure.\",
+              \"assignee\": \"me\"
+            }
+          }"
