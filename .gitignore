@@ -1,4 +1,7 @@
 venv/
+.env
+logs/
+.streamlit/secrets.toml
 .aws-sam/
 *.pyc
 __pycache__/
