@@ -21,8 +21,9 @@ class TouchpointsEnv:
     gmail_refresh_token_wholesale: str | None
     slack_bot_token: str | None
     slack_signing_secret: str | None
-    openai_api_key: str | None
-    anthropic_api_key: str | None
+    gemini_api_key: str | None
+    google_cloud_project: str | None
+    gemini_vertex_location: str | None
     database_url: str | None
 
     @classmethod
@@ -35,7 +36,9 @@ class TouchpointsEnv:
             gmail_refresh_token_wholesale=os.environ.get("GMAIL_REFRESH_TOKEN_WHOLESALE"),
             slack_bot_token=os.environ.get("SLACK_BOT_TOKEN"),
             slack_signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
-            openai_api_key=os.environ.get("OPENAI_API_KEY"),
-            anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            gemini_api_key=os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY"),
+            google_cloud_project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            gemini_vertex_location=os.environ.get("GEMINI_VERTEX_LOCATION"),
             database_url=os.environ.get("DATABASE_URL"),
         )

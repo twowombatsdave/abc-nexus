@@ -63,9 +63,11 @@ Two supported patterns:
 
 The repo already references `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` in workflows — you may reuse or create a dedicated **Touchpoints** Slack app.
 
-## AI / LLM
+## AI / LLM (Gemini)
 
-- **Summarization + classification**: OpenAI, Anthropic, or Vertex (if already on GCP).
+- **Summarization + classification**: **Gemini** (project standard).
+- **Google AI Studio**: set `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey) (simplest for dev).
+- **Vertex AI Gemini** (optional): same GCP project as BigQuery; use ADC + `GOOGLE_CLOUD_PROJECT` + region — good for prod IAM.
 - Store **model name + prompt version** on each row for audit.
 
 ## Database
@@ -87,8 +89,9 @@ The repo already references `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` in workflows 
 | `SLACK_BOT_TOKEN` | Already used elsewhere; ensure scopes for history |
 | `SLACK_SIGNING_SECRET` | Verify Slack Events requests |
 | `SLACK_APP_TOKEN` | Only if using Socket Mode |
-| `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | LLM summarization |
-| `DATABASE_URL` | Postgres connection string (touchpoints schema) |
+| `GEMINI_API_KEY` | Gemini (AI Studio) for summaries / classification |
+| `GOOGLE_CLOUD_PROJECT` + ADC | Optional: Vertex Gemini instead of API key |
+| `DATABASE_URL` | Postgres connection string (touchpoints schema), if used |
 
 **Optional**: `TOUCHPOINTS_ENCRYPTION_KEY` if you encrypt raw payloads at rest.
 
@@ -118,5 +121,6 @@ The repo already references `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` in workflows 
 ## Related code in this repo
 
 - `integrations/touchpoints/` — shared models and env keys (scaffolding).
+- **Credentials checklist**: `docs/touchpoints-credentials-todo.md`
 - Existing Google patterns: `dbt/sheet_to_bigquery.py`, `sheet_seed.yml` (service account).
 - Slack notification pattern: `.github/workflows/sheet_seed.yml`.
