@@ -6,8 +6,8 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
   ASANA_PROJECT_GID — optional; defaults to project 1209401086303491
   ASANA_TASK_SCOPE — optional; set to `workspace` to ignore project and use workspace+assignee
-  ASANA_PROJECT_INCLUDE_UNASSIGNED — optional; default true: in project scope, include open tasks
-    with no assignee (many board tasks are unassigned in the API). Set false to require assignee match.
+  ASANA_PROJECT_INCLUDE_UNASSIGNED — optional; set true to include open tasks with no assignee in project scope
+    (default is assigned-to-configured-users only).
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -135,13 +135,14 @@ def render_brand_content(
         return
     if tasks_in_scope == 0:
         st.warning(
-            "No **incomplete** tasks in **current scope**: try **`ASANA_TASK_SCOPE=workspace`** "
-            "in `.env` (then refresh) for assignee tasks across the workspace, or ensure "
-            "**`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`** (default) so unassigned project tasks count."
+            "No **incomplete** tasks **assigned** to your configured people in **current scope**. "
+            "Add **`ASANA_TASK_SCOPE=workspace`** to `.env` (then refresh) to list their tasks across "
+            "the workspace, or set **`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`** if you also need "
+            "unassigned rows in the project."
         )
         return
     st.info(
-        f"No tasks matched **{brand}** keywords in title or description. "
+        f"No tasks matched **{brand}** keywords in title, notes, description, or custom fields. "
         f"**{tasks_in_scope}** task(s) in scope appear in other brand tabs or need "
         f"new keywords in `integrations/asana/brands.py`."
     )
@@ -168,8 +169,8 @@ def main() -> None:
             st.caption(
                 f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
                 f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`). "
-                "Unassigned open tasks in this project are included by default "
-                "(`ASANA_PROJECT_INCLUDE_UNASSIGNED=false` to require Alan/Cormac only)."
+                "Only tasks **assigned** to the people above count unless you set "
+                "**`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`**."
             )
         refresh = st.button("Refresh from Asana")
         if refresh:

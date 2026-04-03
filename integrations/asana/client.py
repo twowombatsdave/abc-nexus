@@ -1,6 +1,9 @@
 """
 Asana REST client: list active (incomplete) tasks for named assignees, then filter by brand.
 
+Brand keywords match task title, plain notes, HTML-stripped description, and custom field text
+(see ``integrations.asana.brands.task_search_text``). Comments/stories are not fetched.
+
 Uses GET /workspaces/{gid}/users to resolve names.
 
 Tasks: Asana does **not** allow ``assignee`` + ``project`` on ``GET /tasks`` (400). With a
@@ -42,6 +45,15 @@ TASK_OPT_FIELDS: tuple[str, ...] = (
     "assignee",
     "assignee.gid",
     "assignee.name",
+    # Brand keyword search also scans custom field labels and values (see brands.task_search_text).
+    "custom_fields.name",
+    "custom_fields.text_value",
+    "custom_fields.display_value",
+    "custom_fields.number_value",
+    "custom_fields.enum_value",
+    "custom_fields.enum_value.name",
+    "custom_fields.multi_enum_values",
+    "custom_fields.multi_enum_values.name",
 )
 
 
@@ -134,14 +146,14 @@ def _is_task_incomplete(task: dict[str, Any]) -> bool:
 
 def project_include_unassigned_from_env() -> bool:
     """
-    When scoping by project, include incomplete tasks with no assignee.
+    When scoping by project, also include incomplete tasks with no assignee.
 
-    Asana often returns ``assignee: null`` for tasks that only live in a board/project;
-    strict assignee-only filtering then yields zero rows. Default is to include those
-    tasks. Set ``ASANA_PROJECT_INCLUDE_UNASSIGNED=false`` to require an assignee match.
+    Default is **false** (only tasks assigned to configured assignees). Set
+    ``ASANA_PROJECT_INCLUDE_UNASSIGNED=true`` if your board lists tasks with
+    ``assignee: null`` in the API but you still want them in the dashboard.
     """
-    raw = os.environ.get("ASANA_PROJECT_INCLUDE_UNASSIGNED", "true").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    raw = os.environ.get("ASANA_PROJECT_INCLUDE_UNASSIGNED", "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 def _filter_project_tasks_for_assignees(

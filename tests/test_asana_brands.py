@@ -7,33 +7,57 @@ from integrations.asana.mock_tasks import mock_tasks_by_brand, mock_tasks_univer
 
 
 def test_brand_matches_case_insensitive() -> None:
-    assert brand_matches_task("Killa", "Review killa SKU", None, None) is True
-    assert brand_matches_task("SYX", "SYX roadmap", None, None) is True
-    assert brand_matches_task("Ubbs", "Nothing here", None, None) is False
+    assert brand_matches_task("Killa", {"name": "Review killa SKU"}) is True
+    assert brand_matches_task("SYX", {"name": "SYX roadmap"}) is True
+    assert brand_matches_task("Ubbs", {"name": "Nothing here"}) is False
 
 
 def test_legacy_brands() -> None:
-    assert brand_matches_task("ZYN", "Review zyn SKU", None, None) is True
-    assert brand_matches_task("Velo", "VELO roadmap", None, None) is True
-    assert brand_matches_task("Nordic Spirit", "nordicspirit pack", None, None) is True
-    assert brand_matches_task("FUMi", "fumi labels", None, None) is True
+    assert brand_matches_task("ZYN", {"name": "Review zyn SKU"}) is True
+    assert brand_matches_task("Velo", {"name": "VELO roadmap"}) is True
+    assert brand_matches_task("Nordic Spirit", {"name": "nordicspirit pack"}) is True
+    assert brand_matches_task("FUMi", {"name": "fumi labels"}) is True
 
 
 def test_elf_word_boundary() -> None:
-    assert brand_matches_task("ELF", "ELF launch pack", None, None) is True
-    assert brand_matches_task("ELF", "Bookshelf install", None, None) is False
+    assert brand_matches_task("ELF", {"name": "ELF launch pack"}) is True
+    assert brand_matches_task("ELF", {"name": "Bookshelf install"}) is False
 
 
 def test_html_notes_searched() -> None:
     assert (
         brand_matches_task(
             "LUMi",
-            "Task",
-            None,
-            "<body>LUMi mention in rich text</body>",
+            {
+                "name": "Task",
+                "html_notes": "<body>LUMi mention in rich text</body>",
+            },
         )
         is True
     )
+
+
+def test_notes_only_match() -> None:
+    assert brand_matches_task(
+        "Killa",
+        {"name": "Pricing review", "notes": "Discuss killa line extension"},
+    ) is True
+
+
+def test_custom_fields_searched() -> None:
+    task = {
+        "name": "Untitled",
+        "notes": "",
+        "html_notes": "",
+        "custom_fields": [
+            {
+                "name": "Segment",
+                "display_value": "ZYN Launch",
+                "enum_value": {"name": "ZYN"},
+            },
+        ],
+    }
+    assert brand_matches_task("ZYN", task) is True
 
 
 def test_filter_excludes_completed() -> None:
