@@ -8,8 +8,9 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_TASK_SCOPE — optional; set to `workspace` to ignore project and use workspace+assignee
   ASANA_PROJECT_INCLUDE_UNASSIGNED — optional; set true to include open tasks with no assignee in project scope
     (default is assigned-to-configured-users only).
-  ASANA_PROJECT_INCLUDE_SUBTASKS — optional; default true: walk subtasks under each project task (API omits them from project lists).
+  ASANA_PROJECT_INCLUDE_SUBTASKS — optional; set true to walk subtasks in project scope (extra API calls; default off).
   ASANA_PROJECT_SUBTASK_MAX_DEPTH — optional; max nesting depth when walking subtasks (default 5).
+  ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY — optional; parallel subtask GETs when subtasks enabled (default 8).
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -173,7 +174,8 @@ def main() -> None:
                 f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`). "
                 "Only tasks **assigned** to the people above count unless you set "
                 "**`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`**. "
-                "Subtasks are included by default (`ASANA_PROJECT_INCLUDE_SUBTASKS=false` to disable)."
+                "Project subtasks are **off** by default (fast load). Set **`ASANA_PROJECT_INCLUDE_SUBTASKS=true`** "
+                "to walk subtasks, or use **workspace** scope for assignee tasks including subtasks without that."
             )
         refresh = st.button("Refresh from Asana")
         if refresh:

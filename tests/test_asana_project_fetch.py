@@ -26,11 +26,11 @@ def test_is_task_incomplete() -> None:
     assert _is_task_incomplete({"completed": True}) is False
 
 
-def test_project_include_subtasks_default_on(monkeypatch) -> None:
+def test_project_include_subtasks_default_off(monkeypatch) -> None:
     monkeypatch.delenv("ASANA_PROJECT_INCLUDE_SUBTASKS", raising=False)
-    assert project_include_subtasks_from_env() is True
-    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "false")
     assert project_include_subtasks_from_env() is False
+    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "true")
+    assert project_include_subtasks_from_env() is True
 
 
 def test_expand_project_tasks_with_subtasks(monkeypatch) -> None:
@@ -46,11 +46,10 @@ def test_expand_project_tasks_with_subtasks(monkeypatch) -> None:
         "integrations.asana.client._paginate_subtasks_for_task",
         fake_subtasks,
     )
-    session = requests.Session()
     out = _expand_project_tasks_with_subtasks(
-        session,
         [{"gid": "p1", "name": "parent", "num_subtasks": 1}],
         max_depth=3,
+        token="test-token",
     )
     gids = {t["gid"] for t in out}
     assert gids == {"p1", "c1"}

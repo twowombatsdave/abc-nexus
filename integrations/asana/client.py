@@ -8,9 +8,9 @@ Uses GET /workspaces/{gid}/users to resolve names.
 
 Tasks: Asana does **not** allow ``assignee`` + ``project`` on ``GET /tasks`` (400). With a
 ``project_gid`` we paginate ``GET /tasks?project=...&completed_since=now`` (top-level tasks
-only), then optionally merge **subtasks** via ``GET /tasks/{parent_gid}/subtasks`` — the
-project list API does not return subtask rows. Without a project, we use
-``assignee`` + ``workspace`` per user.
+only). Optional subtask walk via ``GET /tasks/{parent_gid}/subtasks`` is **off** by default
+(``ASANA_PROJECT_INCLUDE_SUBTASKS``); workspace scope includes assignee subtasks without it.
+Without a project, we use ``assignee`` + ``workspace`` per user.
 """
 
 from __future__ import annotations
@@ -182,10 +182,22 @@ def project_include_subtasks_from_env() -> bool:
     """
     After listing top-level project tasks, also fetch each task's subtasks (recursive).
 
-    Default **true**. Set ``ASANA_PROJECT_INCLUDE_SUBTASKS=false`` to skip (faster, fewer API calls).
+    Default **false** (fast project load). Set ``ASANA_PROJECT_INCLUDE_SUBTASKS=true`` to
+    include subtasks in project scope (many API calls — use workspace scope for assignee
+    subtasks without this). Parallel fetches use :func:`project_subtask_fetch_workers_from_env`.
     """
-    raw = os.environ.get("ASANA_PROJECT_INCLUDE_SUBTASKS", "true").strip().lower()
-    return raw not in ("0", "false", "no", "off")
+    raw = os.environ.get("ASANA_PROJECT_INCLUDE_SUBTASKS", "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def project_subtask_fetch_workers_from_env() -> int:
+    """Parallelism for subtask GETs when project subtasks are enabled (default ``8``, max ``32``)."""
+    raw = os.environ.get("ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY", "8").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 8
+    return max(1, min(n, 32))
 
 
 def project_subtask_max_depth_from_env() -> int:
@@ -232,19 +244,25 @@ def _paginate_subtasks_for_task(
     return collected
 
 
+def _new_session_for_token(token: str) -> requests.Session:
+    s = requests.Session()
+    s.headers.update(_headers(token))
+    return s
+
+
 def _expand_project_tasks_with_subtasks(
-    session: requests.Session,
     tasks: list[dict[str, Any]],
     *,
     max_depth: int,
+    token: str,
 ) -> list[dict[str, Any]]:
     """
-    Merge in subtasks for each task in ``tasks`` (breadth-first), deduping by task gid.
+    Merge in subtasks level-by-level. Each level parallelizes GET /tasks/{{parent}}/subtasks.
 
     Asana's ``GET /tasks?project=...`` omits subtasks; they only appear under
     ``GET /tasks/{parent}/subtasks``.
     """
-    from collections import deque
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     by_gid: dict[str, dict[str, Any]] = {}
     for t in tasks:
@@ -252,33 +270,56 @@ def _expand_project_tasks_with_subtasks(
         if gid:
             by_gid[str(gid)] = t
 
-    queue: deque[tuple[str, int]] = deque()
-    for t in tasks:
-        if t.get("gid"):
-            queue.append((str(t["gid"]), 0))
+    if not by_gid:
+        return []
 
-    fetched_subtasks_for_parent: set[str] = set()
+    fetched_parents: set[str] = set()
+    workers = project_subtask_fetch_workers_from_env()
+    current_level: list[str] = [str(t["gid"]) for t in tasks if t.get("gid")]
 
-    while queue:
-        parent_gid, depth = queue.popleft()
-        if depth >= max_depth:
-            continue
-        if parent_gid in fetched_subtasks_for_parent:
-            continue
-        parent_task = by_gid.get(parent_gid)
-        ns = parent_task.get("num_subtasks") if isinstance(parent_task, dict) else None
-        if ns == 0:
-            fetched_subtasks_for_parent.add(parent_gid)
-            continue
-        fetched_subtasks_for_parent.add(parent_gid)
-        for st in _paginate_subtasks_for_task(session, parent_gid):
-            sg = st.get("gid")
-            if not sg:
+    def fetch_one(pgid: str) -> tuple[str, list[dict[str, Any]]]:
+        s = _new_session_for_token(token)
+        return pgid, _paginate_subtasks_for_task(s, pgid)
+
+    for _ in range(max_depth):
+        pending: list[str] = []
+        for pgid in current_level:
+            if pgid in fetched_parents:
                 continue
-            sgid = str(sg)
-            if sgid not in by_gid:
-                by_gid[sgid] = st
-            queue.append((sgid, depth + 1))
+            pt = by_gid.get(pgid)
+            if not isinstance(pt, dict):
+                fetched_parents.add(pgid)
+                continue
+            ns = pt.get("num_subtasks")
+            if ns == 0:
+                fetched_parents.add(pgid)
+                continue
+            pending.append(pgid)
+
+        if not pending:
+            break
+
+        next_level: list[str] = []
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            fut_to_pgid = {ex.submit(fetch_one, pgid): pgid for pgid in pending}
+            for fut in as_completed(fut_to_pgid):
+                pgid = fut_to_pgid[fut]
+                try:
+                    _, st_list = fut.result()
+                except Exception:
+                    logger.exception("Asana subtasks fetch failed for parent %s", pgid)
+                    st_list = []
+                fetched_parents.add(pgid)
+                for st in st_list:
+                    sg = st.get("gid")
+                    if not sg:
+                        continue
+                    sgid = str(sg)
+                    if sgid not in by_gid:
+                        by_gid[sgid] = st
+                        next_level.append(sgid)
+
+        current_level = next_level
 
     return list(by_gid.values())
 
@@ -416,9 +457,9 @@ def fetch_incomplete_tasks_for_assignees(
         raw = _paginate_tasks_in_project(session, project_gid.strip())
         if project_include_subtasks_from_env():
             raw = _expand_project_tasks_with_subtasks(
-                session,
                 raw,
                 max_depth=project_subtask_max_depth_from_env(),
+                token=token,
             )
         return _filter_project_tasks_for_assignees(
             raw,
