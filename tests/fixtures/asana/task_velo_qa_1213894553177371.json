@@ -1,0 +1,40 @@
+{
+  "gid": "1213894553177371",
+  "assignee": {
+    "gid": "1197350665112878",
+    "name": "Cormac Folan"
+  },
+  "completed": false,
+  "custom_fields": [
+    {
+      "gid": "1205825475580270",
+      "enum_value": {
+        "gid": "1205825475580272",
+        "name": "2-High"
+      },
+      "name": "~Priority ",
+      "display_value": "2-High"
+    },
+    {
+      "gid": "1210088088547488",
+      "enum_value": {
+        "gid": "1212198036096172",
+        "name": "Trading"
+      },
+      "name": "~Type",
+      "display_value": "Trading"
+    },
+    {
+      "gid": "1207422367581104",
+      "enum_value": null,
+      "name": "~Status",
+      "display_value": null
+    }
+  ],
+  "due_on": null,
+  "html_notes": "<body></body>",
+  "name": "VELO - US - Get US contacts for source etc...",
+  "notes": "",
+  "num_subtasks": 0,
+  "permalink_url": "https://app.asana.com/1/10469352526629/task/1213894553177371"
+}
