@@ -5,6 +5,7 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_ACCESS_TOKEN or ASANA_PAT — Personal Access Token
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
   ASANA_PROJECT_GID — optional; limit tasks to one project
+  ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
   or run: powershell -ExecutionPolicy Bypass -File scripts/init_local_env.ps1
@@ -26,6 +27,8 @@ import streamlit as st
 
 from integrations.asana.brands import BRAND_KEYWORDS
 from integrations.asana.client import (
+    AsanaConfigError,
+    assignee_names_from_env,
     fetch_active_tasks_for_dashboard,
     get_asana_token,
     project_gid_from_env,
@@ -86,12 +89,20 @@ def _on_brand_change() -> None:
     )
 
 
+def _assignee_display(task: dict[str, Any]) -> str:
+    a = task.get("assignee")
+    if isinstance(a, dict):
+        return (a.get("name") or "").strip()
+    return ""
+
+
 def tasks_to_dataframe(tasks: list[dict[str, Any]]) -> pd.DataFrame:
     rows = []
     for t in tasks:
         rows.append(
             {
                 "Task": t.get("name") or "",
+                "Assignee": _assignee_display(t),
                 "Due": t.get("due_on") or "",
                 "Link": t.get("permalink_url") or "",
             }
@@ -121,6 +132,11 @@ def main() -> None:
     with st.sidebar:
         st.title("ABC System")
         st.caption("Outstanding Asana tasks by brand keyword.")
+        st.caption(
+            "Assignees: **"
+            + "**, **".join(assignee_names_from_env())
+            + "** (override with `ASANA_ASSIGNEE_NAMES`)."
+        )
         refresh = st.button("Refresh from Asana")
         if refresh:
             log_ui_event(sid, "refresh_clicked")
@@ -154,10 +170,11 @@ def main() -> None:
             log_ui_event(sid, "asana_fetch_start", refresh=bool(refresh))
             try:
                 with st.spinner("Loading tasks from Asana…"):
-                    brand_tasks = fetch_active_tasks_for_dashboard(
-                        tok, ws, project_gid=proj
-                    )
+                    result = fetch_active_tasks_for_dashboard(tok, ws, project_gid=proj)
+                brand_tasks = result.tasks_by_brand
                 st.session_state.tasks_by_brand = brand_tasks
+                st.session_state.asana_missing_assignees = tuple(result.missing_assignees)
+                st.session_state.asana_resolved_assignees = tuple(result.resolved_assignees)
                 st.session_state.asana_last_error = None
                 data_mode = "live"
                 total = sum(len(v) for v in brand_tasks.values())
@@ -166,14 +183,18 @@ def main() -> None:
                     "asana_fetch_ok",
                     task_rows_total=total,
                     brands=list(brand_tasks.keys()),
+                    assignees_resolved=[p[0] for p in result.resolved_assignees],
                 )
             except Exception as e:
                 msg = f"{type(e).__name__}: {e}"
                 st.session_state.asana_last_error = msg
                 st.session_state.tasks_by_brand = mock_tasks_by_brand()
+                st.session_state.asana_missing_assignees = ()
+                st.session_state.asana_resolved_assignees = ()
                 brand_tasks = st.session_state.tasks_by_brand
                 data_mode = "error"
-                st.error(f"Asana request failed: {e}")
+                prefix = "Asana configuration" if isinstance(e, AsanaConfigError) else "Asana request"
+                st.error(f"{prefix}: {e}")
                 log_ui_event(sid, "asana_fetch_error", error=msg[:500])
         else:
             brand_tasks = st.session_state.tasks_by_brand or mock_tasks_by_brand()
@@ -185,10 +206,16 @@ def main() -> None:
             st.session_state.demo_mode_logged = True
 
     st.caption(
-        f"Data: **{data_mode}** · Active tasks assigned to **you** in the workspace, "
+        f"Data: **{data_mode}** · Active tasks for configured assignees in the workspace, "
         f"filtered by brand keywords (see `integrations/asana/brands.py`). "
         f"Events → `logs/ui_events.jsonl`."
     )
+    miss = st.session_state.get("asana_missing_assignees") or ()
+    if miss:
+        st.warning(
+            "These names were **not** found in the workspace user list (check spelling vs Asana profile): "
+            + ", ".join(f"**{m}**" for m in miss)
+        )
 
     st.markdown("##### Brand")
     brand = st.radio(

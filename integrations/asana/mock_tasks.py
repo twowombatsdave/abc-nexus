@@ -11,6 +11,7 @@ def build_mock_task(
     *,
     notes: str = "",
     completed: bool = False,
+    assignee_name: str = "Alan Doran",
 ) -> dict:
     return {
         "gid": gid,
@@ -20,6 +21,7 @@ def build_mock_task(
         "completed": completed,
         "due_on": None,
         "permalink_url": f"https://app.asana.com/0/0/{gid}",
+        "assignee": {"gid": f"user-{gid}", "name": assignee_name},
     }
 
 
@@ -35,6 +37,7 @@ def mock_tasks_universe() -> list[dict]:
             "m2",
             "Velo pipeline",
             notes="Sync with team on velo POS materials.",
+            assignee_name="Cormac Folan",
         ),
         build_mock_task(
             "m3",

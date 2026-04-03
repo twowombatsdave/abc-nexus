@@ -6,5 +6,8 @@
 ASANA_ACCESS_TOKEN=PASTE_YOUR_PERSONAL_ACCESS_TOKEN_HERE
 ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
 
+# Optional — comma-separated display names (must match Asana profile names):
+# ASANA_ASSIGNEE_NAMES=Alan Doran,Cormac Folan
+
 # Optional — limit fetches to one project:
 # ASANA_PROJECT_GID=PASTE_PROJECT_GID_HERE
