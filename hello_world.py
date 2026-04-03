@@ -6,7 +6,9 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
   ASANA_PROJECT_GID — optional; limit tasks to one project
 
-Local dev: copy .env.example to .env in this folder (never commit .env).
+Local dev: copy .env.example to .env in this folder (never commit .env),
+  or run: powershell -ExecutionPolicy Bypass -File scripts/init_local_env.ps1
+  Then verify: python scripts/verify_asana_connection.py
 
 Run: python -m streamlit run hello_world.py
 
