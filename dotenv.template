@@ -9,5 +9,5 @@ ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
 # Optional — comma-separated display names (must match Asana profile names):
 # ASANA_ASSIGNEE_NAMES=Alan Doran,Cormac Folan
 
-# Optional — limit fetches to one project:
-# ASANA_PROJECT_GID=PASTE_PROJECT_GID_HERE
+# Optional — project GID (defaults to 1209401086303491 if unset):
+# ASANA_PROJECT_GID=1209401086303491

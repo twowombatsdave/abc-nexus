@@ -7,14 +7,13 @@ from typing import Iterable
 
 # Tab order in the Streamlit UI (keys must match).
 BRAND_KEYWORDS: dict[str, list[str]] = {
-    "ZYN": ["zyn"],
-    "Velo": ["velo"],
-    "Nordic Spirit": [
-        "nordic spirit",
-        "nordicspirit",
-        "nordic-spirit",
-    ],
-    "FUMi": ["fumi"],
+    "Killa": ["killa"],
+    "SYX": ["syx"],
+    "ELF": ["elf"],  # matched with word boundaries (see brand_matches_task)
+    "Clew": ["clew"],
+    "FEDRS": ["fedrs", "fedr"],
+    "LUMi": ["lumi"],
+    "Ubbs": ["ubbs"],
 }
 
 
@@ -40,6 +39,9 @@ def brand_matches_task(brand: str, name: str, notes: str | None, html_notes: str
     if not keywords:
         return False
     hay = task_search_blob(name, notes, html_notes)
+    # Avoid matching "elf" inside unrelated words (e.g. "shelf").
+    if brand == "ELF":
+        return bool(re.search(r"\belf\b", hay, re.IGNORECASE))
     return any(_normalize(k) in hay for k in keywords)
 
 

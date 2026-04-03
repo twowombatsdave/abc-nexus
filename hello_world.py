@@ -1,10 +1,10 @@
 """
-ABC dashboard — Asana outstanding tasks by brand (ZYN, Velo, Nordic Spirit, FUMi).
+ABC dashboard — Asana outstanding tasks by brand (Killa, SYX, ELF, Clew, FEDRS, LUMi, Ubbs).
 
 Environment (or Streamlit Cloud secrets with the same names):
   ASANA_ACCESS_TOKEN or ASANA_PAT — Personal Access Token
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
-  ASANA_PROJECT_GID — optional; limit tasks to one project
+  ASANA_PROJECT_GID — optional; defaults to project 1209401086303491
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -28,10 +28,11 @@ import streamlit as st
 from integrations.asana.brands import BRAND_KEYWORDS
 from integrations.asana.client import (
     AsanaConfigError,
+    DEFAULT_PROJECT_GID,
     assignee_names_from_env,
     fetch_active_tasks_for_dashboard,
     get_asana_token,
-    project_gid_from_env,
+    get_project_gid,
     workspace_gid_from_env,
 )
 from integrations.asana.mock_tasks import mock_tasks_by_brand
@@ -137,6 +138,10 @@ def main() -> None:
             + "**, **".join(assignee_names_from_env())
             + "** (override with `ASANA_ASSIGNEE_NAMES`)."
         )
+        st.caption(
+            f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
+            f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`)."
+        )
         refresh = st.button("Refresh from Asana")
         if refresh:
             log_ui_event(sid, "refresh_clicked")
@@ -159,7 +164,7 @@ def main() -> None:
 
     ws = resolve_workspace()
     tok = resolve_token()
-    proj = project_gid_from_env() or _secret("ASANA_PROJECT_GID")
+    proj = get_project_gid(_secret("ASANA_PROJECT_GID"))
 
     data_mode = "demo"
     brand_tasks: dict[str, list[dict[str, Any]]] = mock_tasks_by_brand()

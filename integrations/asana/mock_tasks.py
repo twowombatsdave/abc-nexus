@@ -26,31 +26,46 @@ def build_mock_task(
 
 
 def mock_tasks_universe() -> list[dict]:
-    """A small pool of tasks covering all four brands (incomplete)."""
+    """A small pool of tasks covering brands + one non-matching row."""
     return [
         build_mock_task(
             "m1",
-            "ZYN — retailer follow-up",
-            notes="Confirm listing for ZYN variant.",
+            "Killa — retailer follow-up",
+            notes="Confirm listing for Killa variant.",
         ),
         build_mock_task(
             "m2",
-            "Velo pipeline",
-            notes="Sync with team on velo POS materials.",
+            "SYX pipeline",
+            notes="Sync on SYX POS materials.",
             assignee_name="Cormac Folan",
         ),
         build_mock_task(
             "m3",
-            "Nordic Spirit assets",
-            notes="nordic spirit campaign copy review.",
+            "ELF assets review",
+            notes="ELF campaign copy.",
         ),
         build_mock_task(
             "m4",
-            "FUMi compliance",
-            notes="Check FUMi labeling notes from legal.",
+            "Clew compliance",
+            notes="Clew labeling notes.",
         ),
         build_mock_task(
             "m5",
+            "FEDRS launch checklist",
+            notes="fedrs regulatory.",
+        ),
+        build_mock_task(
+            "m6",
+            "LUMi packaging",
+            notes="lumi SKU update.",
+        ),
+        build_mock_task(
+            "m7",
+            "Ubbs retailer",
+            notes="ubbs listing.",
+        ),
+        build_mock_task(
+            "m8",
             "Unrelated task",
             notes="No brand keywords here.",
         ),

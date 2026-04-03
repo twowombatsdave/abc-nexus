@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 ASANA_API_BASE = "https://app.asana.com/api/1.0"
 
+# Default project for task queries (override with ASANA_PROJECT_GID).
+DEFAULT_PROJECT_GID = "1209401086303491"
+
 # Default dashboard assignees (override with ASANA_ASSIGNEE_NAMES=comma,separated)
 DEFAULT_ASSIGNEE_NAMES: tuple[str, ...] = ("Alan Doran", "Cormac Folan")
 
@@ -254,6 +257,15 @@ def workspace_gid_from_env() -> str | None:
     return gid.strip() if gid else None
 
 
-def project_gid_from_env() -> str | None:
-    gid = os.environ.get("ASANA_PROJECT_GID")
-    return gid.strip() if gid else None
+def get_project_gid(streamlit_secret: str | None = None) -> str:
+    """
+    Project GID for GET /tasks (assignee + project scope).
+
+    Order: ``ASANA_PROJECT_GID`` env → optional Streamlit secret → :data:`DEFAULT_PROJECT_GID`.
+    """
+    raw = os.environ.get("ASANA_PROJECT_GID")
+    if raw is not None and raw.strip():
+        return raw.strip()
+    if streamlit_secret is not None and str(streamlit_secret).strip():
+        return str(streamlit_secret).strip()
+    return DEFAULT_PROJECT_GID

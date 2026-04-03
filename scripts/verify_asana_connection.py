@@ -17,6 +17,9 @@ from pathlib import Path
 import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from integrations.asana.client import get_project_gid  # noqa: E402
 
 
 def _load_dotenv() -> None:
@@ -52,12 +55,13 @@ def main() -> int:
     me = r.json().get("data") or {}
     print("OK — authenticated as:", me.get("name", "?"), f"({me.get('email', 'no email')})")
 
+    proj = get_project_gid()
     r2 = requests.get(
         "https://app.asana.com/api/1.0/tasks",
         headers=headers,
         params={
             "assignee": "me",
-            "workspace": ws,
+            "project": proj,
             "completed_since": "now",
             "limit": 5,
             "opt_fields": "name,completed",
@@ -65,10 +69,10 @@ def main() -> int:
         timeout=30,
     )
     if r2.status_code != 200:
-        print("GET /tasks (workspace sample) failed:", r2.status_code, r2.text[:400])
+        print("GET /tasks (project sample) failed:", r2.status_code, r2.text[:400])
         return 1
     n = len(r2.json().get("data") or [])
-    print("OK — sample incomplete tasks returned:", n)
+    print("OK — sample incomplete tasks in project", proj, ":", n)
     return 0
 
 
