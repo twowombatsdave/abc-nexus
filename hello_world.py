@@ -5,6 +5,7 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_ACCESS_TOKEN or ASANA_PAT — Personal Access Token
   ASANA_WORKSPACE_GID — workspace GID (required for live data)
   ASANA_PROJECT_GID — optional; defaults to project 1209401086303491
+  ASANA_TASK_SCOPE — optional; set to `workspace` to ignore project and use workspace+assignee
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -33,6 +34,8 @@ from integrations.asana.client import (
     fetch_active_tasks_for_dashboard,
     get_asana_token,
     get_project_gid,
+    get_task_fetch_project_gid,
+    task_scope_is_workspace,
     workspace_gid_from_env,
 )
 from integrations.asana.mock_tasks import mock_tasks_by_brand
@@ -111,18 +114,35 @@ def tasks_to_dataframe(tasks: list[dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def render_brand_content(brand: str, tasks: list[dict[str, Any]]) -> None:
-    if not tasks:
-        st.info(f"No active tasks matched **{brand}** keywords in title or description.")
+def render_brand_content(
+    brand: str,
+    tasks: list[dict[str, Any]],
+    *,
+    tasks_in_scope: int,
+) -> None:
+    if tasks:
+        df = tasks_to_dataframe(tasks)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Link": st.column_config.LinkColumn("Open in Asana", display_text="Open"),
+            },
+        )
         return
-    df = tasks_to_dataframe(tasks)
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Link": st.column_config.LinkColumn("Open in Asana", display_text="Open"),
-        },
+    if tasks_in_scope == 0:
+        st.warning(
+            "No tasks in **current scope**: no open tasks in this project assigned to "
+            "your configured assignees — or they live outside this project. "
+            "Add **`ASANA_TASK_SCOPE=workspace`** to `.env` (then refresh) to pull tasks "
+            "from the whole workspace for those assignees."
+        )
+        return
+    st.info(
+        f"No tasks matched **{brand}** keywords in title or description. "
+        f"**{tasks_in_scope}** task(s) in scope appear in other brand tabs or need "
+        f"new keywords in `integrations/asana/brands.py`."
     )
 
 
@@ -138,10 +158,16 @@ def main() -> None:
             + "**, **".join(assignee_names_from_env())
             + "** (override with `ASANA_ASSIGNEE_NAMES`)."
         )
-        st.caption(
-            f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
-            f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`)."
-        )
+        if task_scope_is_workspace():
+            st.caption(
+                "Scope: **workspace** (tasks for assignees across workspace; no project filter). "
+                "Unset `ASANA_TASK_SCOPE` to use the project below."
+            )
+        else:
+            st.caption(
+                f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
+                f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`)."
+            )
         refresh = st.button("Refresh from Asana")
         if refresh:
             log_ui_event(sid, "refresh_clicked")
@@ -164,7 +190,7 @@ def main() -> None:
 
     ws = resolve_workspace()
     tok = resolve_token()
-    proj = get_project_gid(_secret("ASANA_PROJECT_GID"))
+    proj = get_task_fetch_project_gid(_secret("ASANA_PROJECT_GID"))
 
     data_mode = "demo"
     brand_tasks: dict[str, list[dict[str, Any]]] = mock_tasks_by_brand()
@@ -180,6 +206,8 @@ def main() -> None:
                 st.session_state.tasks_by_brand = brand_tasks
                 st.session_state.asana_missing_assignees = tuple(result.missing_assignees)
                 st.session_state.asana_resolved_assignees = tuple(result.resolved_assignees)
+                st.session_state.asana_tasks_in_scope = result.tasks_in_scope
+                st.session_state.asana_sample_titles = tuple(result.sample_task_titles)
                 st.session_state.asana_last_error = None
                 data_mode = "live"
                 total = sum(len(v) for v in brand_tasks.values())
@@ -187,6 +215,7 @@ def main() -> None:
                     sid,
                     "asana_fetch_ok",
                     task_rows_total=total,
+                    tasks_in_scope=result.tasks_in_scope,
                     brands=list(brand_tasks.keys()),
                     assignees_resolved=[p[0] for p in result.resolved_assignees],
                 )
@@ -196,6 +225,8 @@ def main() -> None:
                 st.session_state.tasks_by_brand = mock_tasks_by_brand()
                 st.session_state.asana_missing_assignees = ()
                 st.session_state.asana_resolved_assignees = ()
+                st.session_state.asana_tasks_in_scope = None
+                st.session_state.asana_sample_titles = ()
                 brand_tasks = st.session_state.tasks_by_brand
                 data_mode = "error"
                 prefix = "Asana configuration" if isinstance(e, AsanaConfigError) else "Asana request"
@@ -206,15 +237,28 @@ def main() -> None:
             data_mode = "live"
     else:
         st.session_state.tasks_by_brand = None
+        st.session_state.asana_tasks_in_scope = None
+        st.session_state.asana_sample_titles = ()
         if not st.session_state.get("demo_mode_logged"):
             log_ui_event(sid, "demo_mode", token_set=bool(tok), workspace_set=bool(ws))
             st.session_state.demo_mode_logged = True
 
+    scope_for_ui = st.session_state.get("asana_tasks_in_scope")
+    if scope_for_ui is None or data_mode == "demo":
+        scope_for_ui = sum(len(v) for v in brand_tasks.values())
     st.caption(
-        f"Data: **{data_mode}** · Active tasks for configured assignees in the workspace, "
-        f"filtered by brand keywords (see `integrations/asana/brands.py`). "
+        f"Data: **{data_mode}** · **{scope_for_ui}** task(s) in scope before brand filter · "
+        f"Keywords in `integrations/asana/brands.py`. "
         f"Events → `logs/ui_events.jsonl`."
     )
+    if (
+        data_mode == "live"
+        and st.session_state.get("asana_sample_titles")
+        and scope_for_ui > 0
+    ):
+        with st.expander("Sample task titles in scope (debug)", expanded=False):
+            for t in st.session_state.asana_sample_titles:
+                st.text(t or "(untitled)")
     miss = st.session_state.get("asana_missing_assignees") or ()
     if miss:
         st.warning(
@@ -232,7 +276,11 @@ def main() -> None:
         on_change=_on_brand_change,
     )
     st.subheader(brand)
-    render_brand_content(brand, brand_tasks.get(brand, []))
+    render_brand_content(
+        brand,
+        brand_tasks.get(brand, []),
+        tasks_in_scope=int(scope_for_ui),
+    )
 
 
 if __name__ == "__main__":

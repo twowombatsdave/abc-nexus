@@ -40,6 +40,7 @@ TASK_OPT_FIELDS: tuple[str, ...] = (
     "due_on",
     "permalink_url",
     "assignee",
+    "assignee.gid",
     "assignee.name",
 )
 
@@ -55,6 +56,8 @@ class DashboardFetchResult:
     tasks_by_brand: dict[str, list[dict[str, Any]]]
     resolved_assignees: tuple[tuple[str, str], ...]  # (display_name, gid)
     missing_assignees: tuple[str, ...]
+    tasks_in_scope: int  # open tasks for assignees after project/workspace scope, before brand filter
+    sample_task_titles: tuple[str, ...]  # first few titles for troubleshooting
 
 
 def get_asana_token() -> str | None:
@@ -251,7 +254,7 @@ def fetch_incomplete_tasks_for_assignees(
         raw = _paginate_tasks_in_project(session, project_gid.strip())
         out: list[dict[str, Any]] = []
         for t in raw:
-            if t.get("completed"):
+            if t.get("completed") is True:
                 continue
             ag = _task_assignee_gid(t)
             if ag and ag in allowed:
@@ -310,16 +313,38 @@ def fetch_active_tasks_for_dashboard(
     for brand in BRAND_KEYWORDS:
         out[brand] = filter_tasks_for_brand(raw, brand)
 
+    titles = tuple(
+        (t.get("name") or "").strip() for t in raw[:12] if isinstance(t, dict)
+    )
+
     return DashboardFetchResult(
         tasks_by_brand=out,
         resolved_assignees=tuple(resolved_pairs),
         missing_assignees=tuple(missing),
+        tasks_in_scope=len(raw),
+        sample_task_titles=titles,
     )
 
 
 def workspace_gid_from_env() -> str | None:
     gid = os.environ.get("ASANA_WORKSPACE_GID")
     return gid.strip() if gid else None
+
+
+def task_scope_is_workspace() -> bool:
+    """If True, fetch uses assignee+workspace (no project filter). Set ``ASANA_TASK_SCOPE=workspace``."""
+    return os.environ.get("ASANA_TASK_SCOPE", "project").strip().lower() == "workspace"
+
+
+def get_task_fetch_project_gid(streamlit_secret: str | None = None) -> str | None:
+    """
+    Project GID for scoped fetch, or None to use workspace-wide assignee queries.
+
+    When :func:`task_scope_is_workspace` is True, returns None regardless of project default.
+    """
+    if task_scope_is_workspace():
+        return None
+    return get_project_gid(streamlit_secret)
 
 
 def get_project_gid(streamlit_secret: str | None = None) -> str:

@@ -60,7 +60,7 @@ def filter_tasks_for_brand(
     """Keep tasks that are not completed and match the brand keywords."""
     out: list[dict] = []
     for t in tasks:
-        if t.get("completed"):
+        if t.get("completed") is True:
             continue
         name = t.get("name") or ""
         notes = t.get("notes")
