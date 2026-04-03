@@ -8,9 +8,10 @@ Environment (or Streamlit Cloud secrets with the same names):
   ASANA_TASK_SCOPE — optional; set to `workspace` to ignore project and use workspace+assignee
   ASANA_PROJECT_INCLUDE_UNASSIGNED — optional; set true to include open tasks with no assignee in project scope
     (default is assigned-to-configured-users only).
-  ASANA_PROJECT_INCLUDE_SUBTASKS — optional; set true to walk subtasks in project scope (extra API calls; default off).
+  ASANA_PROJECT_INCLUDE_SUBTASKS — optional; walk subtasks under project tasks (default true).
+  ASANA_DASHBOARD_SUBTASKS_ONLY — optional; show subtasks only, not parent tasks (default true).
   ASANA_PROJECT_SUBTASK_MAX_DEPTH — optional; max nesting depth when walking subtasks (default 5).
-  ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY — optional; parallel subtask GETs when subtasks enabled (default 8).
+  ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY — optional; parallel subtask GETs (default 8).
   ASANA_ASSIGNEE_NAMES — optional; comma-separated (default: Alan Doran, Cormac Folan)
 
 Local dev: copy .env.example to .env in this folder (never commit .env),
@@ -36,6 +37,7 @@ from integrations.asana.client import (
     AsanaConfigError,
     DEFAULT_PROJECT_GID,
     assignee_names_from_env,
+    dashboard_subtasks_only_from_env,
     fetch_active_tasks_for_dashboard,
     get_asana_token,
     get_project_gid,
@@ -157,7 +159,10 @@ def main() -> None:
 
     with st.sidebar:
         st.title("ABC System")
-        st.caption("Open (incomplete) Asana tasks by brand keyword — completed tasks are excluded.")
+        st.caption(
+            "Open (incomplete) Asana **subtasks** by brand keyword (parents hidden) — "
+            "completed tasks are excluded. Override with `ASANA_DASHBOARD_SUBTASKS_ONLY=false`."
+        )
         st.caption(
             "Assignees: **"
             + "**, **".join(assignee_names_from_env())
@@ -165,17 +170,17 @@ def main() -> None:
         )
         if task_scope_is_workspace():
             st.caption(
-                "Scope: **workspace** (tasks for assignees across workspace; no project filter). "
+                "Scope: **workspace** (assignee tasks across workspace; no project filter). "
+                "With subtasks-only mode, only tasks that have a **parent** are shown. "
                 "Unset `ASANA_TASK_SCOPE` to use the project below."
             )
         else:
             st.caption(
                 f"Project: **{get_project_gid(_secret('ASANA_PROJECT_GID'))}** "
                 f"(override with `ASANA_PROJECT_GID`; default `{DEFAULT_PROJECT_GID}`). "
-                "Only tasks **assigned** to the people above count unless you set "
-                "**`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`**. "
-                "Project subtasks are **off** by default (fast load). Set **`ASANA_PROJECT_INCLUDE_SUBTASKS=true`** "
-                "to walk subtasks, or use **workspace** scope for assignee tasks including subtasks without that."
+                "Loads **subtasks** under project tasks by default; dashboard shows **subtasks only** "
+                f"(**`ASANA_DASHBOARD_SUBTASKS_ONLY`** = **{dashboard_subtasks_only_from_env()}**). "
+                "Only rows **assigned** to the people above unless **`ASANA_PROJECT_INCLUDE_UNASSIGNED=true`**."
             )
         refresh = st.button("Refresh from Asana")
         if refresh:
@@ -220,6 +225,7 @@ def main() -> None:
                 st.session_state.asana_scope_includes_unassigned = bool(
                     result.scope_includes_unassigned_incomplete
                 )
+                st.session_state.asana_subtasks_only = bool(result.subtasks_only)
                 st.session_state.asana_last_error = None
                 data_mode = "live"
                 total = sum(len(v) for v in brand_tasks.values())
@@ -228,6 +234,7 @@ def main() -> None:
                     "asana_fetch_ok",
                     task_rows_total=total,
                     tasks_in_scope=result.tasks_in_scope,
+                    subtasks_only=bool(result.subtasks_only),
                     brands=list(brand_tasks.keys()),
                     assignees_resolved=[p[0] for p in result.resolved_assignees],
                 )
@@ -240,6 +247,7 @@ def main() -> None:
                 st.session_state.asana_tasks_in_scope = None
                 st.session_state.asana_sample_titles = ()
                 st.session_state.asana_scope_includes_unassigned = False
+                st.session_state.asana_subtasks_only = True
                 brand_tasks = st.session_state.tasks_by_brand
                 data_mode = "error"
                 prefix = "Asana configuration" if isinstance(e, AsanaConfigError) else "Asana request"
@@ -261,9 +269,11 @@ def main() -> None:
         scope_for_ui = sum(len(v) for v in brand_tasks.values())
     scope_note = ""
     if data_mode == "live" and st.session_state.get("asana_scope_includes_unassigned"):
-        scope_note = " · Project scope includes **unassigned** open tasks (see sidebar)."
+        scope_note += " · Project scope includes **unassigned** open tasks (see sidebar)."
+    if data_mode == "live" and st.session_state.get("asana_subtasks_only", True):
+        scope_note += " · Rows are **subtasks only** (parent tasks excluded)."
     st.caption(
-        f"Data: **{data_mode}** · **{scope_for_ui}** incomplete task(s) in scope before brand filter · "
+        f"Data: **{data_mode}** · **{scope_for_ui}** incomplete subtask row(s) in scope before brand filter · "
         f"Keywords in `integrations/asana/brands.py`. "
         f"Events → `logs/ui_events.txt`."
         f"{scope_note}"

@@ -9,8 +9,11 @@ from integrations.asana.client import (
     _filter_project_tasks_for_assignees,
     _is_task_incomplete,
     _task_assignee_gid,
+    _task_is_subtask,
+    dashboard_subtasks_only_from_env,
     project_include_subtasks_from_env,
     project_include_unassigned_from_env,
+    project_should_expand_subtasks,
 )
 
 
@@ -26,11 +29,34 @@ def test_is_task_incomplete() -> None:
     assert _is_task_incomplete({"completed": True}) is False
 
 
-def test_project_include_subtasks_default_off(monkeypatch) -> None:
+def test_project_include_subtasks_default_on(monkeypatch) -> None:
     monkeypatch.delenv("ASANA_PROJECT_INCLUDE_SUBTASKS", raising=False)
-    assert project_include_subtasks_from_env() is False
-    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "true")
     assert project_include_subtasks_from_env() is True
+    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "false")
+    assert project_include_subtasks_from_env() is False
+
+
+def test_dashboard_subtasks_only_default_on(monkeypatch) -> None:
+    monkeypatch.delenv("ASANA_DASHBOARD_SUBTASKS_ONLY", raising=False)
+    assert dashboard_subtasks_only_from_env() is True
+    monkeypatch.setenv("ASANA_DASHBOARD_SUBTASKS_ONLY", "false")
+    assert dashboard_subtasks_only_from_env() is False
+
+
+def test_task_is_subtask() -> None:
+    assert _task_is_subtask({"parent": {"gid": "1"}}) is True
+    assert _task_is_subtask({"parent": None}) is False
+    assert _task_is_subtask({}) is False
+
+
+def test_project_should_expand_for_subtasks_only_dashboard(monkeypatch) -> None:
+    monkeypatch.delenv("ASANA_DASHBOARD_SUBTASKS_ONLY", raising=False)
+    assert project_should_expand_subtasks("1209401086303491") is True
+    monkeypatch.setenv("ASANA_DASHBOARD_SUBTASKS_ONLY", "false")
+    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "false")
+    assert project_should_expand_subtasks("1209401086303491") is False
+    monkeypatch.setenv("ASANA_PROJECT_INCLUDE_SUBTASKS", "true")
+    assert project_should_expand_subtasks("1209401086303491") is True
 
 
 def test_expand_project_tasks_with_subtasks(monkeypatch) -> None:

@@ -7,10 +7,10 @@ Brand keywords match task title, plain notes, HTML-stripped description, and cus
 Uses GET /workspaces/{gid}/users to resolve names.
 
 Tasks: Asana does **not** allow ``assignee`` + ``project`` on ``GET /tasks`` (400). With a
-``project_gid`` we paginate ``GET /tasks?project=...&completed_since=now`` (top-level tasks
-only). Optional subtask walk via ``GET /tasks/{parent_gid}/subtasks`` is **off** by default
-(``ASANA_PROJECT_INCLUDE_SUBTASKS``); workspace scope includes assignee subtasks without it.
-Without a project, we use ``assignee`` + ``workspace`` per user.
+``project_gid`` we paginate top-level tasks, then walk subtasks (see ``ASANA_PROJECT_INCLUDE_SUBTASKS``).
+By default the dashboard shows **subtasks only** (``ASANA_DASHBOARD_SUBTASKS_ONLY``): parent rows
+from the project list are dropped after expansion. Workspace scope uses ``parent`` on each task
+to apply the same filter. Without a project, we use ``assignee`` + ``workspace`` per user.
 """
 
 from __future__ import annotations
@@ -47,6 +47,8 @@ TASK_OPT_FIELDS: tuple[str, ...] = (
     "assignee",
     "assignee.gid",
     "assignee.name",
+    "parent",
+    "parent.gid",
     # Brand keyword search also scans custom field labels and values (see brands.task_search_text).
     "custom_fields.name",
     "custom_fields.text_value",
@@ -73,6 +75,7 @@ class DashboardFetchResult:
     tasks_in_scope: int  # open tasks for assignees after project/workspace scope, before brand filter
     sample_task_titles: tuple[str, ...]  # first few titles for troubleshooting
     scope_includes_unassigned_incomplete: bool = False  # project mode: unassigned rows included
+    subtasks_only: bool = True  # dashboard rows are subtasks only (not parent tasks)
 
 
 def get_asana_token() -> str | None:
@@ -146,6 +149,12 @@ def _is_task_incomplete(task: dict[str, Any]) -> bool:
     return task.get("completed") is not True
 
 
+def _task_is_subtask(task: dict[str, Any]) -> bool:
+    """True when Asana reports a parent task (this row is a subtask)."""
+    p = task.get("parent")
+    return isinstance(p, dict) and bool(p.get("gid"))
+
+
 def project_include_unassigned_from_env() -> bool:
     """
     When scoping by project, also include incomplete tasks with no assignee.
@@ -182,12 +191,31 @@ def project_include_subtasks_from_env() -> bool:
     """
     After listing top-level project tasks, also fetch each task's subtasks (recursive).
 
-    Default **false** (fast project load). Set ``ASANA_PROJECT_INCLUDE_SUBTASKS=true`` to
-    include subtasks in project scope (many API calls — use workspace scope for assignee
-    subtasks without this). Parallel fetches use :func:`project_subtask_fetch_workers_from_env`.
+    Default **true**. Set ``ASANA_PROJECT_INCLUDE_SUBTASKS=false`` to skip the walk (not
+    compatible with :func:`dashboard_subtasks_only_from_env` when that is true — expansion
+    is forced for project scope). Uses :func:`project_subtask_fetch_workers_from_env`.
     """
-    raw = os.environ.get("ASANA_PROJECT_INCLUDE_SUBTASKS", "").strip().lower()
-    return raw in ("1", "true", "yes", "on")
+    raw = os.environ.get("ASANA_PROJECT_INCLUDE_SUBTASKS", "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def dashboard_subtasks_only_from_env() -> bool:
+    """
+    Dashboard rows are **subtasks only** (drop top-level project tasks / parents).
+
+    Default **true**. Set ``ASANA_DASHBOARD_SUBTASKS_ONLY=false`` to show parent tasks too
+    (after expansion). Workspace scope uses ``parent`` on each task; project scope drops
+    rows whose gid came from the initial project list.
+    """
+    raw = os.environ.get("ASANA_DASHBOARD_SUBTASKS_ONLY", "true").strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def project_should_expand_subtasks(project_gid: str | None) -> bool:
+    """Expand subtasks when subtasks-only mode needs them, or when explicitly enabled."""
+    if project_gid and project_gid.strip() and dashboard_subtasks_only_from_env():
+        return True
+    return project_include_subtasks_from_env()
 
 
 def project_subtask_fetch_workers_from_env() -> int:
@@ -454,13 +482,18 @@ def fetch_incomplete_tasks_for_assignees(
     if project_gid and project_gid.strip():
         if include_unassigned_in_project is None:
             include_unassigned_in_project = project_include_unassigned_from_env()
-        raw = _paginate_tasks_in_project(session, project_gid.strip())
-        if project_include_subtasks_from_env():
+        pg = project_gid.strip()
+        top_level = _paginate_tasks_in_project(session, pg)
+        top_gids = {str(t["gid"]) for t in top_level if t.get("gid")}
+        raw: list[dict[str, Any]] = list(top_level)
+        if project_should_expand_subtasks(project_gid):
             raw = _expand_project_tasks_with_subtasks(
-                raw,
+                top_level,
                 max_depth=project_subtask_max_depth_from_env(),
                 token=token,
             )
+        if dashboard_subtasks_only_from_env():
+            raw = [t for t in raw if t.get("gid") and str(t["gid"]) not in top_gids]
         return _filter_project_tasks_for_assignees(
             raw,
             allowed,
@@ -476,7 +509,10 @@ def fetch_incomplete_tasks_for_assignees(
             gid = t.get("gid")
             if gid:
                 by_task_gid[str(gid)] = t
-    return list(by_task_gid.values())
+    raw_ws = list(by_task_gid.values())
+    if dashboard_subtasks_only_from_env():
+        raw_ws = [t for t in raw_ws if _task_is_subtask(t)]
+    return raw_ws
 
 
 def fetch_active_tasks_for_dashboard(
@@ -539,6 +575,7 @@ def fetch_active_tasks_for_dashboard(
         tasks_in_scope=len(raw),
         sample_task_titles=titles,
         scope_includes_unassigned_incomplete=bool(project_gid and inc_unassigned),
+        subtasks_only=dashboard_subtasks_only_from_env(),
     )
 
 

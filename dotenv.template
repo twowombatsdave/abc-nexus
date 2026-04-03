@@ -17,7 +17,11 @@ ASANA_WORKSPACE_GID=PASTE_YOUR_WORKSPACE_GID_HERE
 # Optional — project scope: also include open tasks with no assignee (default: assigned only):
 # ASANA_PROJECT_INCLUDE_UNASSIGNED=true
 
-# Optional — project scope: walk subtasks (default off; many API calls — prefer workspace scope for subtasks):
+# Optional — project scope: walk subtasks (default true):
 # ASANA_PROJECT_INCLUDE_SUBTASKS=true
+
+# Optional — dashboard rows: subtasks only, hide parent tasks (default true):
+# ASANA_DASHBOARD_SUBTASKS_ONLY=true
+
 # ASANA_PROJECT_SUBTASK_MAX_DEPTH=5
 # ASANA_PROJECT_SUBTASK_MAX_CONCURRENCY=8
