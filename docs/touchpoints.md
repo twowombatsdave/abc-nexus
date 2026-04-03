@@ -95,6 +95,19 @@ The repo already references `SLACK_BOT_TOKEN` / `SLACK_CHANNEL_ID` in workflows 
 
 **Optional**: `TOUCHPOINTS_ENCRYPTION_KEY` if you encrypt raw payloads at rest.
 
+## Where the ABC System gets secrets at runtime (not from GitHub)
+
+**GitHub** only stores secrets for **CI** (Actions workflows when they run). The **Streamlit app and Python code do not connect to GitHub** to read credentials.
+
+| Environment | How `GOOGLE_SERVICE_ACCOUNT_JSON` / paths get to the process |
+|---------------|----------------------------------------------------------------|
+| **Local** | `.env` (gitignored) or `GOOGLE_APPLICATION_CREDENTIALS` → file path |
+| **Streamlit Community Cloud** | **App secrets** in the hosting UI (same keys as env vars — paste JSON or set path strategy) |
+| **Your own server / Docker / AWS** | **Environment variables** or **Secrets Manager** / Parameter Store injected at deploy time |
+| **GitHub Actions** only | Repository **Secrets** — for scheduled jobs or deploy steps, not for the live website |
+
+So: you copy the **same names and values** you used in GitHub into wherever **ABC System runs** (Streamlit secrets panel, ECS task env, etc.). The code only reads **`os.environ`** — it doesn’t care whether the value came from a file or a secret manager.
+
 ## Local development
 
 1. Copy `dotenv.template` → `.env` and fill OAuth/Slack/DB placeholders.
