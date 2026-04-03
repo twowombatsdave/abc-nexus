@@ -56,15 +56,15 @@ def main() -> int:
     print("OK — authenticated as:", me.get("name", "?"), f"({me.get('email', 'no email')})")
 
     proj = get_project_gid()
+    # assignee + project together returns 400; sample by project only.
     r2 = requests.get(
         "https://app.asana.com/api/1.0/tasks",
         headers=headers,
         params={
-            "assignee": "me",
             "project": proj,
             "completed_since": "now",
             "limit": 5,
-            "opt_fields": "name,completed",
+            "opt_fields": "name,completed,assignee",
         },
         timeout=30,
     )

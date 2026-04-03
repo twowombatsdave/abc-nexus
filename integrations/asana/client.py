@@ -1,8 +1,12 @@
 """
 Asana REST client: list active (incomplete) tasks for named assignees, then filter by brand.
 
-Uses GET /workspaces/{gid}/users to resolve names, then GET /tasks per assignee with
-workspace + completed_since=now (see Asana docs).
+Uses GET /workspaces/{gid}/users to resolve names.
+
+Tasks: Asana does **not** allow ``assignee`` + ``project`` on ``GET /tasks`` (400). With a
+``project_gid`` we paginate ``GET /tasks?project=...&completed_since=now`` and keep tasks
+whose assignee is one of the configured users. Without a project, we use
+``assignee`` + ``workspace`` per user.
 """
 
 from __future__ import annotations
@@ -112,6 +116,47 @@ def list_workspace_users(session: requests.Session, workspace_gid: str) -> list[
     return [x for x in data if isinstance(x, dict)]
 
 
+def _task_assignee_gid(task: dict[str, Any]) -> str | None:
+    a = task.get("assignee")
+    if isinstance(a, dict) and a.get("gid"):
+        return str(a["gid"])
+    return None
+
+
+def _paginate_tasks_in_project(
+    session: requests.Session,
+    project_gid: str,
+) -> list[dict[str, Any]]:
+    """Paginate open tasks in a project (do not combine with assignee — API returns 400)."""
+    collected: list[dict[str, Any]] = []
+    offset: str | None = None
+    opt = ",".join(TASK_OPT_FIELDS)
+
+    while True:
+        params: dict[str, Any] = {
+            "project": project_gid,
+            "completed_since": "now",
+            "limit": 100,
+            "opt_fields": opt,
+        }
+        if offset:
+            params["offset"] = offset
+
+        payload = _request_json(session, "/tasks", params)
+        batch = payload.get("data") or []
+        for item in batch:
+            if isinstance(item, dict):
+                collected.append(item)
+
+        next_page = payload.get("next_page")
+        if isinstance(next_page, dict) and next_page.get("offset"):
+            offset = str(next_page["offset"])
+        else:
+            break
+
+    return collected
+
+
 def resolve_assignee_gids_from_user_list(
     users: list[dict[str, Any]],
     display_names: list[str],
@@ -188,14 +233,34 @@ def fetch_incomplete_tasks_for_assignees(
     *,
     project_gid: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Incomplete tasks for any of the given assignee user gids; deduped by task gid."""
+    """
+    Incomplete tasks for any of the given assignee user gids.
+
+    With ``project_gid``: paginate tasks **in that project** only, then keep tasks assigned
+    to one of ``assignee_gids`` (Asana forbids ``assignee`` + ``project`` query params).
+
+    Without ``project_gid``: paginate per assignee with ``assignee`` + ``workspace``.
+    """
     session = requests.Session()
     session.headers.update(_headers(token))
 
     assignee_gids = list(dict.fromkeys(assignee_gids))
+    allowed = set(assignee_gids)
+
+    if project_gid and project_gid.strip():
+        raw = _paginate_tasks_in_project(session, project_gid.strip())
+        out: list[dict[str, Any]] = []
+        for t in raw:
+            if t.get("completed"):
+                continue
+            ag = _task_assignee_gid(t)
+            if ag and ag in allowed:
+                out.append(t)
+        return out
+
     by_task_gid: dict[str, dict[str, Any]] = {}
     for agid in assignee_gids:
-        batch = _paginate_tasks_for_assignee(session, agid, workspace_gid, project_gid)
+        batch = _paginate_tasks_for_assignee(session, agid, workspace_gid, None)
         for t in batch:
             gid = t.get("gid")
             if gid:
@@ -259,7 +324,7 @@ def workspace_gid_from_env() -> str | None:
 
 def get_project_gid(streamlit_secret: str | None = None) -> str:
     """
-    Project GID for GET /tasks (assignee + project scope).
+    Project GID used to scope tasks (paginate by project, then filter assignees in app).
 
     Order: ``ASANA_PROJECT_GID`` env → optional Streamlit secret → :data:`DEFAULT_PROJECT_GID`.
     """
