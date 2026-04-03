@@ -1,0 +1,5 @@
+# Minimal stack for the ABC System Streamlit dashboard (hello_world.py, app.py).
+# Install: pip install -r requirements-abc-app.txt
+pandas>=2.0.0
+streamlit>=1.30.0
+requests>=2.28.0
